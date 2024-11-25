@@ -92,9 +92,33 @@ let static_page  _req =
         ]
       ]
 
+let dialog_static_page  _req =
+  let open Dream_html in
+  let open HTML in
+    html [class_ "no-js"]
+      [ head []
+        [ title [] ""
+        ; link [id "favicon"; href "/favicon.png";rel "icon";type_"image/png"]
+        ; link [href "/dialog/style.css";rel "stylesheet"]
+        ; script []
+          {|
+            window.addEventListener('message', event => {
+              const data = event.data
+              console.log('data', data)
+              document.title = data.title
+              document.querySelector('.page').innerHTML = data.body
+            })
+          |}
+        ]
+      ; body []
+        [ div [class_"page"] []
+        ]
+    ]
+
 
 
 let handler req = Dream_html.respond (static_page req)
+let dialog_handler req = Dream_html.respond (dialog_static_page req)
 
 let dynamic_view_url req =
   let target = Dream.target req in
@@ -129,15 +153,6 @@ let reclaim_handler request =
 
 *)
 
-let _dialog_handler request =
-  let%lwt body = Dream.body request in
-  let queries = Dream.all_queries request in
-  let queries_string = queries |> List.map ( function (a,b) -> Printf.sprintf "(%s,%s)" a b ) |> String.concat ", " in
-  Dream.log "Dialog '%s'" body;
-  Dream.log "Queries '%s'" queries_string;
-    Dream.respond ~status:`OK ""
-(*     Dream_html.respond (static_page request) *)
-
 let () =
   Dream.run
 (*     ~tls:true *)
@@ -148,7 +163,8 @@ let () =
     @@ Dream.memory_sessions
     @@ Dream.router
     [ Dream.get "/" handler
-(*     ; Dream.get "/dialog/" dialog_handler *)
+    ; Dream.get "/dialog/style.css" (Dream.from_filesystem "./server/dialog" "dialog.css")   (* This is for debugging only *)
+    ; Dream.get "/dialog/" dialog_handler
     ; Dream.get "/logout" logout_handler
     ; Dream.get "/favicon.png" (Dream.from_filesystem "./server/" "favicon.png")
     ; Dream.get "/client.js" (Dream.from_filesystem "./server/" "client.js")

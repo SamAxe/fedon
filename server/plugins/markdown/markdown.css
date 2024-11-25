@@ -1,0 +1,43 @@
+
+.markdown ul, .markdown ol {
+  padding-left: 0;
+  margin-left: -0.5em;
+}
+
+.markdown > ul, .markdown > ol {
+  padding-left: 1em;
+  margin-left: 0
+}
+
+.markdown li {
+  padding-left: 0.5em;
+}
+
+.markdown blockquote ul, .markdown blockquote ol {
+  padding-left: 0;
+  margin-left: -0.5em;
+}
+
+.markdown blockquote > ul, .markdown blockquote > ol {
+  padding-left: 1em;
+  margin-left: 0;
+}
+
+.markdown blockquote li {
+  padding-left: 0.5em;
+}
+
+.markdown code {
+  background: rgba(0,0,0,0.04);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+}
+
+ul.task-list {
+  list-style: none;
+}
+
+li.task-list-item input {
+  margin-left: -2.2em;
+  margin-right: 1em;
+}
