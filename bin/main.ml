@@ -101,13 +101,16 @@ let handler page_info req = Dream_html.respond (static_page page_info req)
 let () =
   let info = make_page_info () in
   Dream.run
+(*     ~tls:true *)
     ~port:8081
     ~error_handler:Dream.debug_error_handler
+    @@ Dream.origin_referrer_check
     @@ Dream.logger
     @@ Dream.memory_sessions
     @@ Dream.router
     [
       Dream.get "/" (handler info) ;
+      Dream.get "/welcome-visitors.json" (Dream.from_filesystem "./" "welcome-visitors.json");
       Dream.get "/**" (Dream.static "./server/");
       Dream.get "/fail"
         (fun _ ->
