@@ -1,7 +1,7 @@
 
 type page_info =
   { title : string
-  ; page  : string
+  ; pages : string list
   ; authenticated : bool
   ; owned : bool
   ; isOwner : bool
@@ -35,14 +35,15 @@ let static_page (info:page_info) _req =
         ]
       ; body []
         [ section [ class_ "main"]
-          [ (* txt "{{#pages}}" *)
-            div [class_ "page"; id "%s" info.page; tabindex (-1); attr "{{{origin}}}"; attr "{{{generated}}}" ]
-            [ div [ class_ "paper"]
-              [ txt "{{{story}}}"
+          (
+            List.map ( fun page ->
+              div [class_ "page"; id "%s" page; tabindex (-1); attr "{{{origin}}}"; attr "{{{generated}}}" ]
+              [ div [ class_ "paper"]
+                [ txt "{{{story}}}"
+                ]
               ]
-            ]
-(*           ; txt "{{/pages}}" *)
-          ]
+            ) info.pages
+          )
         ; footer []
           [ div [ id "site-owner"; class_ "footer-item"]
             [ (* txt "{{#owned}}" *)
@@ -50,18 +51,16 @@ let static_page (info:page_info) _req =
             ; span [id "site-owner"; style_ "text-transform:capitalize;"] [ txt "%s" info.ownedBy ]
 (*             ; txt "{{/owned}}" *)
             ]
+
+            ; div [id "security"; class_ "footer-item"] []
+
+            ; span [class_ "searchbox"; class_ "footer-item"]
+              [ input [ class_ "search"; name "search"; type_ "text"; placeholder "Search"]
+              ; span [class_ "pages"] []
+              ]
+
+            ; span [class_ "neighborhood"] []
           ]
-
-          ; div [id "security"; class_ "footer-item"] []
-
-          ; span [class_ "searchbox"; class_ "footer-item"]
-            [ txt "&nbsp;"
-            ; input [ class_ "search"; name "search"; type_ "text"; placeholder "Search"]
-            ; txt "&nbsp;"
-            ; span [class_ "pages"] []
-            ]
-
-          ; span [class_ "neighborhood"] []
         ; script []
         {|
           var isAuthenticated = ("%b" === "true");
@@ -83,7 +82,7 @@ let static_page (info:page_info) _req =
 
 let make_page_info () =
   { title = "Welcome Visitors"
-  ; page  = "welcome-visitors"
+  ; pages  = [ "welcome-visitors" ]
   ; authenticated = true
   ; owned = true
   ; isOwner = true
@@ -96,6 +95,13 @@ let make_page_info () =
 
 let handler page_info req = Dream_html.respond (static_page page_info req)
 
+let dynamic_view_url req =
+  let page_info = make_page_info () in
+  let target = Dream.target req in
+  let fields = String.split_on_char '/' (String.trim target) |> List.filter ( function f -> (f = "view" || (String.trim f) = "") |> not ) in
+  let page_info' = { page_info with pages = fields } in
+    Dream.log "Requesting %d pages in: '%s'" (List.length fields) (String.concat "|" fields)
+    ; handler page_info' req
 
 
 let () =
@@ -108,16 +114,25 @@ let () =
     @@ Dream.logger
     @@ Dream.memory_sessions
     @@ Dream.router
-    [
-      Dream.get "/" (handler info) ;
-      Dream.get "/welcome-visitors.json" (Dream.from_filesystem "./" "welcome-visitors.json");
-      Dream.get "/**" (Dream.static "./server/");
-      Dream.get "/fail"
+    [ Dream.get "/" (handler info)
+    ; Dream.get "/favicon.png" (Dream.from_filesystem "./server/" "favicon.png")
+    ; Dream.get "/client.js" (Dream.from_filesystem "./server/" "client.js")
+    ; Dream.get "/client.js.map" (Dream.from_filesystem "./server/" "client.js.map")   (* This is for debugging only *)
+    ; Dream.get "/security/**" (Dream.static "./server/security")
+    ; Dream.get "/system/**" (Dream.static "./server/system")
+    ; Dream.get "/images/**" (Dream.static "./server/images")
+    ; Dream.get "/plugins/**" (Dream.static "./server/plugins")
+    ; Dream.get "/js/**" (Dream.static "./server/js")
+    ; Dream.get "/style/**" (Dream.static "./server/style")
+    ; Dream.get "/theme/**" (Dream.static "./server/theme")
+    ; Dream.get "/view/**" dynamic_view_url
+    ; Dream.get "/**" (Dream.static "./server/pages")
+    ; Dream.get "/fail"
         (fun _ ->
-          raise (Failure "The Web app failed!"));
-      Dream.get "/bad"
+          raise (Failure "The Web app failed!"))
+    ; Dream.get "/bad"
         (fun _ ->
-          Dream.empty `Bad_Request);
+          Dream.empty `Bad_Request)
 
 
     ]
