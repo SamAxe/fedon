@@ -129,6 +129,14 @@ let reclaim_handler request =
 
 *)
 
+let _dialog_handler request =
+  let%lwt body = Dream.body request in
+  let queries = Dream.all_queries request in
+  let queries_string = queries |> List.map ( function (a,b) -> Printf.sprintf "(%s,%s)" a b ) |> String.concat ", " in
+  Dream.log "Dialog '%s'" body;
+  Dream.log "Queries '%s'" queries_string;
+    Dream.respond ~status:`OK ""
+(*     Dream_html.respond (static_page request) *)
 
 let () =
   Dream.run
@@ -140,6 +148,7 @@ let () =
     @@ Dream.memory_sessions
     @@ Dream.router
     [ Dream.get "/" handler
+(*     ; Dream.get "/dialog/" dialog_handler *)
     ; Dream.get "/logout" logout_handler
     ; Dream.get "/favicon.png" (Dream.from_filesystem "./server/" "favicon.png")
     ; Dream.get "/client.js" (Dream.from_filesystem "./server/" "client.js")
