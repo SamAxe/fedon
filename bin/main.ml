@@ -1,8 +1,8 @@
 
-type page_info =
+type wiki_server_info =
   { title : string
-  ; pages : string list
-  ; authenticated : bool
+  ; pages : string list ref
+  ; authenticated : bool ref
   ; owned : bool
   ; isOwner : bool
   ; ownedBy : string
@@ -10,12 +10,24 @@ type page_info =
   ; user : string
   }
 
-let static_page (info:page_info) _req =
+let wiki_server_info =
+  { title         = "Fedon"
+  ; pages         = ref [ "welcome-visitors" ]
+  ; authenticated = ref false
+  ; owned         = true
+  ; isOwner       = true
+  ; ownedBy       = "two bits"
+  ; seedNeighbors = ""
+  ; user          = "two bits"
+  }
+
+
+let static_page  _req =
   let open Dream_html in
   let open HTML in
     html [class_ "no-js"]
       [ head []
-          [ title [] "%s" info.title
+          [ title [] "%s" wiki_server_info.title
           ; meta [content "text/html"; charset "UTF-8"; http_equiv `content_type]
           ; meta [content "width=device-width, height=device-height, initial-scale=1.0, user-scalable=no"; name "viewport"]
           ; link [id "favicon"; href "/favicon.png"; rel "icon"; type_ "image/png"]
@@ -42,13 +54,13 @@ let static_page (info:page_info) _req =
                 [ txt "{{{story}}}"
                 ]
               ]
-            ) info.pages
+            ) !(wiki_server_info.pages)
           )
         ; footer []
           [ div [ id "site-owner"; class_ "footer-item"]
             [ (* txt "{{#owned}}" *)
               txt "Site Owned by: "
-            ; span [id "site-owner"; style_ "text-transform:capitalize;"] [ txt "%s" info.ownedBy ]
+            ; span [id "site-owner"; style_ "text-transform:capitalize;"] [ txt "%s" wiki_server_info.ownedBy ]
 (*             ; txt "{{/owned}}" *)
             ]
 
@@ -71,41 +83,54 @@ let static_page (info:page_info) _req =
           var user = "%s"
           wiki.security(user);
          |}
-          info.authenticated
-          info.owned
-          info.isOwner
-          info.ownedBy
-          info.seedNeighbors
-          info.user
+          !(wiki_server_info.authenticated)
+          wiki_server_info.owned
+          wiki_server_info.isOwner
+          wiki_server_info.ownedBy
+          wiki_server_info.seedNeighbors
+          wiki_server_info.user
         ]
       ]
 
-let make_page_info () =
-  { title = "Welcome Visitors"
-  ; pages  = [ "welcome-visitors" ]
-  ; authenticated = true
-  ; owned = true
-  ; isOwner = true
-  ; ownedBy = "two bits"
-  ; seedNeighbors = ""
-  ; user = "two bits"
-  }
 
 
-
-let handler page_info req = Dream_html.respond (static_page page_info req)
+let handler req = Dream_html.respond (static_page req)
 
 let dynamic_view_url req =
-  let page_info = make_page_info () in
   let target = Dream.target req in
   let fields = String.split_on_char '/' (String.trim target) |> List.filter ( function f -> (f = "view" || (String.trim f) = "") |> not ) in
-  let page_info' = { page_info with pages = fields } in
-    Dream.log "Requesting %d pages in: '%s'" (List.length fields) (String.concat "|" fields)
-    ; handler page_info' req
+    wiki_server_info.pages := fields
+    ; Dream.log "Requesting %d pages in: '%s'" (List.length fields) (String.concat "|" fields)
+    ; handler req
+
+let logout_handler req =
+  wiki_server_info.authenticated := false
+  ; Dream_html.respond (static_page req)
+
+let reclaim_handler request =
+  let%lwt body = Dream.body request in
+  Dream.log "Comparing '%s' with '1234'" body;
+    if body = "1234"
+    then begin wiki_server_info.authenticated := true ; Dream_html.respond (static_page request) end
+    else begin Dream_html.respond ~status:`Unauthorized (static_page request) end
+
+(*
+  let%lwt body = Dream.body request in
+
+  let message_object =
+    body
+    |> Yojson.Safe.from_string
+    |> message_object_of_yojson
+  in
+
+  `String message_object.message
+  |> Yojson.Safe.to_string
+  |> Dream.json
+
+*)
 
 
 let () =
-  let info = make_page_info () in
   Dream.run
 (*     ~tls:true *)
     ~port:8081
@@ -114,7 +139,8 @@ let () =
     @@ Dream.logger
     @@ Dream.memory_sessions
     @@ Dream.router
-    [ Dream.get "/" (handler info)
+    [ Dream.get "/" handler
+    ; Dream.get "/logout" logout_handler
     ; Dream.get "/favicon.png" (Dream.from_filesystem "./server/" "favicon.png")
     ; Dream.get "/client.js" (Dream.from_filesystem "./server/" "client.js")
     ; Dream.get "/client.js.map" (Dream.from_filesystem "./server/" "client.js.map")   (* This is for debugging only *)
@@ -126,6 +152,8 @@ let () =
     ; Dream.get "/style/**" (Dream.static "./server/style")
     ; Dream.get "/theme/**" (Dream.static "./server/theme")
     ; Dream.get "/view/**" dynamic_view_url
+    ; Dream.post "/auth/reclaim/" reclaim_handler
+
     ; Dream.get "/**" (Dream.static "./server/pages")
     ; Dream.get "/fail"
         (fun _ ->
@@ -133,6 +161,4 @@ let () =
     ; Dream.get "/bad"
         (fun _ ->
           Dream.empty `Bad_Request)
-
-
     ]
