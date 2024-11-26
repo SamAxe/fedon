@@ -1,3 +1,4 @@
+open Ppx_yojson_conv_lib.Yojson_conv.Primitives
 
 type wiki_server_info =
   { title : string
@@ -153,6 +154,100 @@ let reclaim_handler request =
 
 *)
 
+type item =
+  { type_  : string option [@option] [@key "type"]
+  ; id     : string option [@option]
+  ; text   : string option [@option]
+  ; title  : string option [@option]
+  ; prompt : string option [@option]
+  ; story  : item list option [@option]
+  }
+  [@@deriving yojson, show]
+
+type journal_error =
+  { type_ : string [@key "type"]
+  ; msg   : string
+  ; response : string
+  }
+  [@@deriving yojson, show]
+
+type removed_to =
+  { page : string
+  }
+  [@@deriving yojson, show]
+
+type journal_item =
+  { type_  : string option [@option] [@key "type"]
+  ; id     : string option [@option]
+(*   ; text   : string option [@option] *)
+(*   ; title  : string option [@option] *)
+  ; item   : item option [@option]
+  ; removed_to : removed_to option [@option] [@key "removedTo"]
+  ; order  : string list option [@option]
+(*   ; prompt : string option [@option] *)
+(*   ; story  : item list option [@option] *)
+  ; date   : int
+  ; after  : string option [@option]
+  ; error  : journal_error option [@option]
+  }
+  [@@deriving yojson, show]
+
+type fork_page =
+  { title   : string
+  ; story   : item list option [@option]
+  ; journal : journal_item list option [@option]
+  }
+  [@@deriving yojson, show]
+
+
+type action =
+  { type_ : string [@key "type"]
+  ; id    : string option [@option]
+  ; item  : item option [@option]
+  ; after : string option [@option]
+  ; fork_page : fork_page option [@key "forkPage"] [@option]
+  ; date  : int
+  }
+  [@@deriving yojson, show]
+
+(*
+  add
+  edit
+  remove
+  create
+
+  move
+  fork
+*)
+
+let page_action_handler request =
+  let page = Dream.param request "page" in
+  let%lwt body = Dream.body request in
+    if String.starts_with ~prefix:"action=" body
+    then
+      begin
+        Dream.log "Got an action for %s" page
+        ; Dream.log "  Body is '%s'" (String.sub (Dream.from_percent_encoded body) 0 720)
+        ; let action =
+          try
+            String.sub body 7 (String.length body - 7) |> Dream.from_percent_encoded
+            |> Yojson.Safe.from_string
+            |> action_of_yojson
+          with
+          | Yojson.Json_error msg ->
+              failwith (Printf.sprintf "Terminating input '%s'" msg)
+        in
+          Dream.log "  Action is '%s'" (String.sub (show_action action) 0 720)
+          ; Dream.html "ok"
+      end
+    else
+      begin
+        Dream.log "Got an unknown action for %s" page
+        ; Dream.log "  Body is '%s'" body
+        ; Dream.html "ok"
+      end
+
+
 let () =
   Dream.run
 (*     ~tls:true *)
@@ -178,6 +273,7 @@ let () =
     ; Dream.get "/theme/**" (Dream.static "./server/theme")
     ; Dream.get "/view/**" dynamic_view_url
     ; Dream.post "/auth/reclaim/" reclaim_handler
+    ; Dream.put "/page/:page/action" page_action_handler
 
     ; Dream.get "/**" (Dream.static "./server/pages")
     ; Dream.get "/fail"
@@ -187,3 +283,6 @@ let () =
         (fun _ ->
           Dream.empty `Bad_Request)
     ]
+
+
+
