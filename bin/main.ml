@@ -255,6 +255,92 @@ type action =
   }
   [@@deriving yojson, show]
 
+
+type action_edit =
+  { type_ : string [@key "type"]
+  ; id    : string
+  ; item  : item
+  ; date  : int
+  }
+  [@@deriving yojson, show]
+
+
+let parse_action_edit ( text : string ) : action_edit =
+  Dream.log "Edit: Attempting to decode '%s'" text;
+  text
+  |> Yojson.Safe.from_string
+  |> action_edit_of_yojson
+
+type action_add =
+  { type_ : string [@key "type"]
+  ; id    : string
+  ; item  : item
+  ; after : string
+  ; date  : int
+  }
+  [@@deriving yojson, show]
+
+let parse_action_add ( text : string ) : action_add =
+  Dream.log "Add: Attempting to decode '%s'" text;
+  text
+  |> Yojson.Safe.from_string
+  |> action_add_of_yojson
+
+type action_remove =
+  { type_ : string [@key "type"]
+  ; id    : string
+  ; date  : int
+  }
+  [@@deriving yojson, show]
+
+let parse_action_remove ( text : string ) : action_remove =
+  Dream.log "Remove: Attempting to decode '%s'" text;
+  text
+  |> Yojson.Safe.from_string
+  |> action_remove_of_yojson
+
+type action_create_page =
+  { type_ : string [@key "type"]
+  ; item  : item
+  ; date  : int
+  }
+  [@@deriving yojson, show]
+
+let parse_action_create_page ( text : string ) : action_create_page =
+  Dream.log "Create: Attempting to decode '%s'" text;
+  text
+  |> Yojson.Safe.from_string
+  |> action_create_page_of_yojson
+
+type action_move =
+  { type_ : string [@key "type"]
+  ; id    : string
+  ; order : string list
+  ; date  : int
+  }
+  [@@deriving yojson, show]
+
+let parse_action_move ( text : string ) : action_move =
+  Dream.log "Move: Attempting to decode '%s'" text;
+  text
+  |> Yojson.Safe.from_string
+  |> action_move_of_yojson
+
+type action_fork =
+  { type_ : string [@key "type"]
+  ; date  : int
+  ; fork_page  : fork_page [@key "forkPage"]
+  }
+  [@@deriving yojson, show]
+
+let parse_action_fork ( text : string ) : action_fork =
+  Dream.log "Fork: Attempting to decode '%s'" text;
+  text
+  |> Yojson.Safe.from_string
+  |> action_fork_of_yojson
+
+
+
 (*
   add
   edit
@@ -274,17 +360,30 @@ let page_action_handler request =
         ; let decoded_body = body |> Str.global_replace (Str.regexp "+") " " |> (Dream.from_percent_encoded ) in
           Dream.log "  Body is '%s'" (String.sub decoded_body 0 (min (String.length decoded_body) 720))
 (*           Dream.log "  Body is '%s'" (String.sub body 0 (min (String.length body) 720)) *)
-        ; let action =
+        ; let decoded_body' = String.sub decoded_body 7 (String.length decoded_body - 7) in
+          let action =
           try
-            String.sub decoded_body 7 (String.length decoded_body - 7)
+            decoded_body'
             |> Yojson.Safe.from_string
             |> action_of_yojson
           with
           | Yojson.Json_error msg ->
               failwith (Printf.sprintf "Terminating input '%s'" msg)
         in
+          begin
+            match action.type_ with
+            | "edit" -> parse_action_edit decoded_body' |> ignore
+            | "add"  -> parse_action_add decoded_body' |> ignore
+            | "remove" -> parse_action_remove decoded_body' |> ignore
+            | "create" -> parse_action_create_page decoded_body' |> ignore
+            | "move"   -> parse_action_move decoded_body' |> ignore
+            | "fork"   -> parse_action_fork decoded_body' |> ignore
+            | _      -> Dream.log "Unknown action '%s'" action.type_
+          end
+(*
           let action_string = show_action action in
           Dream.log "  Action is '%s'" (String.sub action_string 0 (min (String.length action_string) 720))
+*)
           ; Dream.html "ok"
       end
     else
