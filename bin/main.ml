@@ -1,14 +1,14 @@
 open Ppx_yojson_conv_lib.Yojson_conv.Primitives
 
 type wiki_server_info =
-  { title : string
-  ; pages : string list ref
+  { title         : string
+  ; pages         : string list ref
   ; authenticated : bool ref
-  ; owned : bool
-  ; isOwner : bool
-  ; ownedBy : string
+  ; owned         : bool
+  ; isOwner       : bool
+  ; ownedBy       : string
   ; seedNeighbors : string
-  ; user : string
+  ; user          : string
   }
 
 let wiki_server_info =
@@ -139,74 +139,119 @@ let reclaim_handler request =
     then begin wiki_server_info.authenticated := true ; Dream_html.respond (static_page request) end
     else begin Dream_html.respond ~status:`Unauthorized (static_page request) end
 
-(*
-  let%lwt body = Dream.body request in
-
-  let message_object =
-    body
-    |> Yojson.Safe.from_string
-    |> message_object_of_yojson
-  in
-
-  `String message_object.message
-  |> Yojson.Safe.to_string
-  |> Dream.json
-
-*)
-
 type item =
-  { type_  : string option [@option] [@key "type"]
-  ; id     : string option [@option]
-  ; text   : string option [@option]
-  ; title  : string option [@option]
-  ; prompt : string option [@option]
-  ; story  : item list option [@option]
+  { type_      : string option [@option] [@key "type"]
+  ; id         : string option [@option]
+  ; text       : string option [@option]
+  ; title      : string option [@option]
+  ; prompt     : string option [@option]
+  ; story      : item list option [@option]
+  ; alias      : string option [@option]
+  ; choices    : string option [@option]   (* Only in flagmatic? *)
+  ; columns    : string list option [@option]
+  ; community  : string list option [@option] (* urls, looks like an early roster maybe? *)
+(*   ; data       : json blob  *)
+  ; dot        : string option [@option]  (* Graphviz related *)
+  ; svg        : string option [@option]  (* Graphviz related *)
+(*   ; frozen     : point list option [@option] (* map plugin *) *)
+  ; size        : string option [@option]  (* Image plugin *)
+  ; width       : string option [@option]  (* Image plugin *)
+  ; height      : string option [@option]  (* Image plugin *)
+  ; url         : string option [@option]  (* Image plugin *)
+(*   ; location    : location option [@option]  (* Image plugin *) *)
+  ; caption      : string option [@option]   (* image plugin *)
+  ; source       : string option [@option]  (* image plugin *)
+(*   ; source       : string option [@option]  (* Used sparingly in non image cases*) *)
+
+  ; key         : string option [@option]  (* Fivestar plugin *)
+(*   ; outline    : outline option [@option]  (* outline plugin, it's a mess, skip it.  *) *)
+(*   ; pages    : pages option [@option]  (* importer plugin, it's a mess, skip it.  *) *)
+(*   ; punt     : string option [@option] (* factory plugin, looks messy *) *)
+  ; site         : string option [@option]  (* fork and reference plugin *)
+  ; situated     : string list option [@option]  (* frame plugin *)
+  ; slug         : string option [@option]  (* reference plugin *)
+  ; stars       : string option [@option]  (* fivestar plugin *)
+(*   ; survey       : string option [@option]  (* frame plugin, it's messy *) *)
+  ; tile       : string option [@option]  (* map plugin *)
+  ; wiki       : string option [@option]  (* paragraph plugin, looks like it could be dropped *)
+  ; words       : string option [@option]  (* looks like there was a metrics plugin, looks like it could be dropped *)
+
+(*
+  wiki words zoom
+*)
   }
   [@@deriving yojson, show]
 
 type journal_error =
-  { type_ : string [@key "type"]
-  ; msg   : string
-  ; response : string
+  { type_      : string [@key "type"]
+  ; msg        : string
+  ; response   : string
   }
   [@@deriving yojson, show]
 
 type removed_to =
-  { page : string
+  { page       : string
   }
   [@@deriving yojson, show]
 
 type journal_item =
-  { type_  : string option [@option] [@key "type"]
-  ; id     : string option [@option]
-(*   ; text   : string option [@option] *)
-(*   ; title  : string option [@option] *)
-  ; item   : item option [@option]
-  ; removed_to : removed_to option [@option] [@key "removedTo"]
-  ; order  : string list option [@option]
-(*   ; prompt : string option [@option] *)
-(*   ; story  : item list option [@option] *)
-  ; date   : int
-  ; after  : string option [@option]
-  ; error  : journal_error option [@option]
+  { type_      : string option [@option] [@key "type"]
+  ; id         : string option [@option]
+  ; item       : item option [@option]
+  ; removed_to : removed_to option [@option] [@key "removedTo"] (* part of Remove action *)
+  ; order      : string list option [@option]  (* Part of Move action *)
+  ; date       : int
+  ; after      : string option [@option]
+  ; error      : journal_error option [@option]
+
+  ; alias      : string option [@option]
+  ; caption    : string option [@option]
+  ; choices    : string option [@option]   (* Only in flagmatic? *)
+  ; columns    : string list option [@option]
+  ; community  : string list option [@option] (* urls, looks like an early roster maybe? *)
+(*   ; data       : json blob  *)
+  ; dot        : string option [@option]
+  ; svg        : string option [@option]
+(*   ; frozen     : point list option [@option] (* map plugin *) *)
+  ; size        : string option [@option]  (* Image plugin *)
+  ; width       : string option [@option]  (* Image plugin *)
+  ; height      : string option [@option]  (* Image plugin *)
+  ; source      : string option [@option]  (* image plugin *)
+  ; url         : string option [@option]  (* Image plugin *)
+(*   ; location    : location option [@option]  (* Image plugin *) *)
+  ; key         : string option [@option]  (* Fivestar plugin *)
+(*   ; outline    : outline option [@option]  (* outline plugin, it's a mess, skip it.  *) *)
+  ; prompt      : string option [@option]
+(*   ; punt     : string option [@option] (* factory plugin, looks messy *) *)
+  ; site         : string option [@option]  (* fork action and reference plugin *)
+  ; situated     : string list option [@option]  (* frame plugin *)
+  ; slug         : string option [@option]  (* reference plugin *)
+  ; stars       : string option [@option]  (* fivestar plugin *)
+(*   ; survey       : string option [@option]  (* frame plugin, it's messy *) *)
+  ; tile       : string option [@option]  (* map plugin *)
+  ; words       : string option [@option]  (* looks like there was a metrics plugin, looks like it could be dropped *)
+(*   ; attribution : attribution option [@option] (* looks like dragDrop is only way for this tag to appear, should be used more *) *)
+(*   ; certificate : certificate option [@option] (* always with text from mkplugin.sh, probably can be dropped *) *)
+(*   ; error : error option [@option] (* Most often associated with a move event, but not sure this should be in the journal. *) *)
   }
   [@@deriving yojson, show]
 
 type fork_page =
-  { title   : string
-  ; story   : item list option [@option]
-  ; journal : journal_item list option [@option]
+  { title      : string
+  ; story      : item list option [@option]
+  ; journal    : journal_item list option [@option]
   }
   [@@deriving yojson, show]
 
 
 type action =
-  { type_ : string [@key "type"]
-  ; id    : string option [@option]
-  ; item  : item option [@option]
-  ; after : string option [@option]
-  ; fork_page : fork_page option [@key "forkPage"] [@option]
-  ; date  : int
+  { type_      : string [@key "type"]
+  ; id         : string option [@option]
+  ; item       : item option [@option]
+  ; after      : string option [@option]
+  ; order      : string list option [@option]
+  ; fork_page  : fork_page option [@key "forkPage"] [@option]
+  ; date       : int
   }
   [@@deriving yojson, show]
 
@@ -215,7 +260,6 @@ type action =
   edit
   remove
   create
-
   move
   fork
 *)
@@ -227,7 +271,9 @@ let page_action_handler request =
     then
       begin
         Dream.log "Got an action for %s" page
-        ; Dream.log "  Body is '%s'" (String.sub (Dream.from_percent_encoded body) 0 720)
+        ; let _decoded_body = (Dream.from_percent_encoded body) in
+(*           Dream.log "  Body is '%s'" (String.sub decoded_body 0 (min (String.length decoded_body) 720)) *)
+          Dream.log "  Body is '%s'" (String.sub body 0 (min (String.length body) 720))
         ; let action =
           try
             String.sub body 7 (String.length body - 7) |> Dream.from_percent_encoded
@@ -237,7 +283,8 @@ let page_action_handler request =
           | Yojson.Json_error msg ->
               failwith (Printf.sprintf "Terminating input '%s'" msg)
         in
-          Dream.log "  Action is '%s'" (String.sub (show_action action) 0 720)
+          let action_string = show_action action in
+          Dream.log "  Action is '%s'" (String.sub action_string 0 (min (String.length action_string) 720))
           ; Dream.html "ok"
       end
     else
@@ -246,7 +293,6 @@ let page_action_handler request =
         ; Dream.log "  Body is '%s'" body
         ; Dream.html "ok"
       end
-
 
 let () =
   Dream.run
@@ -257,26 +303,26 @@ let () =
     @@ Dream.logger
     @@ Dream.memory_sessions
     @@ Dream.router
-    [ Dream.get "/" handler
-    ; Dream.get "/dialog/style.css" (Dream.from_filesystem "./server/dialog" "dialog.css")   (* This is for debugging only *)
-    ; Dream.get "/dialog/" dialog_handler
-    ; Dream.get "/logout" logout_handler
-    ; Dream.get "/favicon.png" (Dream.from_filesystem "./server/" "favicon.png")
-    ; Dream.get "/client.js" (Dream.from_filesystem "./server/" "client.js")
-    ; Dream.get "/client.js.map" (Dream.from_filesystem "./server/" "client.js.map")   (* This is for debugging only *)
-    ; Dream.get "/security/**" (Dream.static "./server/security")
-    ; Dream.get "/system/**" (Dream.static "./server/system")
-    ; Dream.get "/images/**" (Dream.static "./server/images")
-    ; Dream.get "/plugins/**" (Dream.static "./server/plugins")
-    ; Dream.get "/js/**" (Dream.static "./server/js")
-    ; Dream.get "/style/**" (Dream.static "./server/style")
-    ; Dream.get "/theme/**" (Dream.static "./server/theme")
-    ; Dream.get "/view/**" dynamic_view_url
+    [ Dream.get  "/" handler
+    ; Dream.get  "/dialog/style.css" (Dream.from_filesystem "./server/dialog" "dialog.css")   (* This is for debugging only *)
+    ; Dream.get  "/dialog/" dialog_handler
+    ; Dream.get  "/logout" logout_handler
+    ; Dream.get  "/favicon.png" (Dream.from_filesystem "./server/" "favicon.png")
+    ; Dream.get  "/client.js" (Dream.from_filesystem "./server/" "client.js")
+    ; Dream.get  "/client.js.map" (Dream.from_filesystem "./server/" "client.js.map")   (* This is for debugging only *)
+    ; Dream.get  "/security/**" (Dream.static "./server/security")
+    ; Dream.get  "/system/**" (Dream.static "./server/system")
+    ; Dream.get  "/images/**" (Dream.static "./server/images")
+    ; Dream.get  "/plugins/**" (Dream.static "./server/plugins")
+    ; Dream.get  "/js/**" (Dream.static "./server/js")
+    ; Dream.get  "/style/**" (Dream.static "./server/style")
+    ; Dream.get  "/theme/**" (Dream.static "./server/theme")
+    ; Dream.get  "/view/**" dynamic_view_url
     ; Dream.post "/auth/reclaim/" reclaim_handler
-    ; Dream.put "/page/:page/action" page_action_handler
+    ; Dream.put  "/page/:page/action" page_action_handler
 
-    ; Dream.get "/**" (Dream.static "./server/pages")
-    ; Dream.get "/fail"
+    ; Dream.get  "/**" (Dream.static "./server/pages")
+    ; Dream.get  "/fail"
         (fun _ ->
           raise (Failure "The Web app failed!"))
     ; Dream.get "/bad"
@@ -285,4 +331,9 @@ let () =
     ]
 
 
-
+(*
+  * The /dialog/ seems like it's very hacky and not sure it needs to hit the server for a popup window.
+  * The JSON action structure is very dynamic and may have better consistency if there were individual structures for each command.
+  * Mixing the serving of client files with the json pages/slugs is a bit confusing.  Routing
+  * The static page is doing more client initialization than it seems like it should.
+*)
