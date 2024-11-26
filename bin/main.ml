@@ -271,12 +271,12 @@ let page_action_handler request =
     then
       begin
         Dream.log "Got an action for %s" page
-        ; let _decoded_body = (Dream.from_percent_encoded body) in
-(*           Dream.log "  Body is '%s'" (String.sub decoded_body 0 (min (String.length decoded_body) 720)) *)
-          Dream.log "  Body is '%s'" (String.sub body 0 (min (String.length body) 720))
+        ; let decoded_body = body |> Str.global_replace (Str.regexp "+") " " |> (Dream.from_percent_encoded ) in
+          Dream.log "  Body is '%s'" (String.sub decoded_body 0 (min (String.length decoded_body) 720))
+(*           Dream.log "  Body is '%s'" (String.sub body 0 (min (String.length body) 720)) *)
         ; let action =
           try
-            String.sub body 7 (String.length body - 7) |> Dream.from_percent_encoded
+            String.sub decoded_body 7 (String.length decoded_body - 7)
             |> Yojson.Safe.from_string
             |> action_of_yojson
           with
