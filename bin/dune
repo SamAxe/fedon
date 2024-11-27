@@ -3,6 +3,15 @@
  (name main)
  (libraries fedon dream dream-html fedwiki)
  (preprocess (pps lwt_ppx ppx_yojson_conv ppx_deriving.show ))
+ (modules main)
+)
+
+(executable
+ (public_name clitest)
+ (name clitest)
+ (libraries fedon fedwiki)
+ (preprocess (pps lwt_ppx ppx_yojson_conv ppx_deriving.show ))
+ (modules clitest)
 )
 
 
