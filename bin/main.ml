@@ -1,5 +1,7 @@
 open Ppx_yojson_conv_lib.Yojson_conv.Primitives
 
+open Wiki.Types
+
 type wiki_server_info =
   { title         : string
   ; pages         : string list ref
@@ -139,131 +141,96 @@ let reclaim_handler request =
     then begin wiki_server_info.authenticated := true ; Dream_html.respond (static_page request) end
     else begin Dream_html.respond ~status:`Unauthorized (static_page request) end
 
-type item =
-  { type_      : string option [@option] [@key "type"]
-  ; id         : string option [@option]
-  ; text       : string option [@option]
-  ; title      : string option [@option]
-  ; prompt     : string option [@option]
-  ; story      : item list option [@option]
-  ; alias      : string option [@option]
-  ; choices    : string option [@option]   (* Only in flagmatic? *)
-  ; columns    : string list option [@option]
-  ; community  : string list option [@option] (* urls, looks like an early roster maybe? *)
-(*   ; data       : json blob  *)
-  ; dot        : string option [@option]  (* Graphviz related *)
-  ; svg        : string option [@option]  (* Graphviz related *)
-(*   ; frozen     : point list option [@option] (* map plugin *) *)
-  ; size        : string option [@option]  (* Image plugin *)
-  ; width       : string option [@option]  (* Image plugin *)
-  ; height      : string option [@option]  (* Image plugin *)
-  ; url         : string option [@option]  (* Image plugin *)
-(*   ; location    : location option [@option]  (* Image plugin *) *)
-  ; caption      : string option [@option]   (* image plugin *)
-  ; source       : string option [@option]  (* image plugin *)
-(*   ; source       : string option [@option]  (* Used sparingly in non image cases*) *)
-
-  ; key         : string option [@option]  (* Fivestar plugin *)
-(*   ; outline    : outline option [@option]  (* outline plugin, it's a mess, skip it.  *) *)
-(*   ; pages    : pages option [@option]  (* importer plugin, it's a mess, skip it.  *) *)
-(*   ; punt     : string option [@option] (* factory plugin, looks messy *) *)
-  ; site         : string option [@option]  (* fork and reference plugin *)
-  ; situated     : string list option [@option]  (* frame plugin *)
-  ; slug         : string option [@option]  (* reference plugin *)
-  ; stars       : string option [@option]  (* fivestar plugin *)
-(*   ; survey       : string option [@option]  (* frame plugin, it's messy *) *)
-  ; tile       : string option [@option]  (* map plugin *)
-  ; wiki       : string option [@option]  (* paragraph plugin, looks like it could be dropped *)
-  ; words       : string option [@option]  (* looks like there was a metrics plugin, looks like it could be dropped *)
 
 (*
-  wiki words zoom
+  add (paragraph)
+  edit (paragraph)
+  remove (paragraph)
+  create (page)
+  move (paragraph)
+  fork (page)
 *)
-  }
-  [@@deriving yojson, show]
 
-type journal_error =
-  { type_      : string [@key "type"]
-  ; msg        : string
-  ; response   : string
-  }
-  [@@deriving yojson, show]
+(* Journal
 
-type removed_to =
-  { page       : string
-  }
-  [@@deriving yojson, show]
-
-type journal_item =
-  { type_      : string option [@option] [@key "type"]
-  ; id         : string option [@option]
-  ; item       : item option [@option]
-  ; removed_to : removed_to option [@option] [@key "removedTo"] (* part of Remove action *)
-  ; order      : string list option [@option]  (* Part of Move action *)
-  ; date       : int
-  ; after      : string option [@option]
-  ; error      : journal_error option [@option]
-
-  ; alias      : string option [@option]
-  ; caption    : string option [@option]
-  ; choices    : string option [@option]   (* Only in flagmatic? *)
-  ; columns    : string list option [@option]
-  ; community  : string list option [@option] (* urls, looks like an early roster maybe? *)
-(*   ; data       : json blob  *)
-  ; dot        : string option [@option]
-  ; svg        : string option [@option]
-(*   ; frozen     : point list option [@option] (* map plugin *) *)
-  ; size        : string option [@option]  (* Image plugin *)
-  ; width       : string option [@option]  (* Image plugin *)
-  ; height      : string option [@option]  (* Image plugin *)
-  ; source      : string option [@option]  (* image plugin *)
-  ; url         : string option [@option]  (* Image plugin *)
-(*   ; location    : location option [@option]  (* Image plugin *) *)
-  ; key         : string option [@option]  (* Fivestar plugin *)
-(*   ; outline    : outline option [@option]  (* outline plugin, it's a mess, skip it.  *) *)
-  ; prompt      : string option [@option]
-(*   ; punt     : string option [@option] (* factory plugin, looks messy *) *)
-  ; site         : string option [@option]  (* fork action and reference plugin *)
-  ; situated     : string list option [@option]  (* frame plugin *)
-  ; slug         : string option [@option]  (* reference plugin *)
-  ; stars       : string option [@option]  (* fivestar plugin *)
-(*   ; survey       : string option [@option]  (* frame plugin, it's messy *) *)
-  ; tile       : string option [@option]  (* map plugin *)
-  ; words       : string option [@option]  (* looks like there was a metrics plugin, looks like it could be dropped *)
-(*   ; attribution : attribution option [@option] (* looks like dragDrop is only way for this tag to appear, should be used more *) *)
-(*   ; certificate : certificate option [@option] (* always with text from mkplugin.sh, probably can be dropped *) *)
-(*   ; error : error option [@option] (* Most often associated with a move event, but not sure this should be in the journal. *) *)
-  }
-  [@@deriving yojson, show]
-
-type fork_page =
-  { title      : string
-  ; story      : item list option [@option]
-  ; journal    : journal_item list option [@option]
-  }
-  [@@deriving yojson, show]
+  date blob_type blob_action blob_payload
 
 
-type action =
-  { type_      : string [@key "type"]
-  ; id         : string option [@option]
-  ; item       : item option [@option]
-  ; after      : string option [@option]
-  ; order      : string list option [@option]
-  ; fork_page  : fork_page option [@key "forkPage"] [@option]
-  ; date       : int
-  }
-  [@@deriving yojson, show]
+  1. play the journal (apply blob_action to blob_payload) e.g. the fold function
+  2. render the blob
+  (3.) cache the render
 
+
+
+  document : item list
+  item     : { type, id, blob }
+
+
+  add    new item      to document
+  edit   existing item in document
+  remove existing item from document
+  move   existing item within document
+
+
+  *aside* Document could be an html document, or maybe a markdown document, or maybe a Paniolo document
+  and then it's a bit about how the parts compose to make the whole, for example, all the items could
+  expose their markdown and then the final document could be rendered in to html.  FedWiki has chosen to
+  render each item independently and then assemble the renders into the whole.  Composition is related
+  to "monads" and company.
+
+*)
 
 type action_edit =
-  { type_ : string [@key "type"]
+  { date  : int
+  ; type_ : string [@key "type"]
+
   ; id    : string
   ; item  : item
-  ; date  : int
   }
   [@@deriving yojson, show]
 
+type action_add =
+  { date  : int
+  ; type_ : string [@key "type"]
+
+  ; id    : string
+  ; item  : item
+  ; after : string
+  }
+  [@@deriving yojson, show]
+
+type action_remove =
+  { date  : int
+  ; type_ : string [@key "type"]
+
+  ; id    : string
+  }
+  [@@deriving yojson, show]
+
+type action_move =
+  { date  : int
+  ; type_ : string [@key "type"]
+
+  ; id    : string
+  ; order : string list
+  }
+  [@@deriving yojson, show]
+
+type action_create_page =
+  { date  : int
+  ; type_ : string [@key "type"]
+
+  ; item  : item
+  }
+  [@@deriving yojson, show]
+
+type action_fork_page =
+  { date  : int
+  ; type_ : string [@key "type"]
+
+  ; fork_page  : fork_page [@key "forkPage"]
+  }
+  [@@deriving yojson, show]
 
 let parse_action_edit ( text : string ) : action_edit =
   Dream.log "Edit: Attempting to decode '%s'" text;
@@ -271,14 +238,6 @@ let parse_action_edit ( text : string ) : action_edit =
   |> Yojson.Safe.from_string
   |> action_edit_of_yojson
 
-type action_add =
-  { type_ : string [@key "type"]
-  ; id    : string
-  ; item  : item
-  ; after : string
-  ; date  : int
-  }
-  [@@deriving yojson, show]
 
 let parse_action_add ( text : string ) : action_add =
   Dream.log "Add: Attempting to decode '%s'" text;
@@ -286,25 +245,11 @@ let parse_action_add ( text : string ) : action_add =
   |> Yojson.Safe.from_string
   |> action_add_of_yojson
 
-type action_remove =
-  { type_ : string [@key "type"]
-  ; id    : string
-  ; date  : int
-  }
-  [@@deriving yojson, show]
-
 let parse_action_remove ( text : string ) : action_remove =
   Dream.log "Remove: Attempting to decode '%s'" text;
   text
   |> Yojson.Safe.from_string
   |> action_remove_of_yojson
-
-type action_create_page =
-  { type_ : string [@key "type"]
-  ; item  : item
-  ; date  : int
-  }
-  [@@deriving yojson, show]
 
 let parse_action_create_page ( text : string ) : action_create_page =
   Dream.log "Create: Attempting to decode '%s'" text;
@@ -312,43 +257,18 @@ let parse_action_create_page ( text : string ) : action_create_page =
   |> Yojson.Safe.from_string
   |> action_create_page_of_yojson
 
-type action_move =
-  { type_ : string [@key "type"]
-  ; id    : string
-  ; order : string list
-  ; date  : int
-  }
-  [@@deriving yojson, show]
-
 let parse_action_move ( text : string ) : action_move =
   Dream.log "Move: Attempting to decode '%s'" text;
   text
   |> Yojson.Safe.from_string
   |> action_move_of_yojson
 
-type action_fork =
-  { type_ : string [@key "type"]
-  ; date  : int
-  ; fork_page  : fork_page [@key "forkPage"]
-  }
-  [@@deriving yojson, show]
-
-let parse_action_fork ( text : string ) : action_fork =
+let parse_action_fork ( text : string ) : action_fork_page =
   Dream.log "Fork: Attempting to decode '%s'" text;
   text
   |> Yojson.Safe.from_string
-  |> action_fork_of_yojson
+  |> action_fork_page_of_yojson
 
-
-
-(*
-  add
-  edit
-  remove
-  create
-  move
-  fork
-*)
 
 let page_action_handler request =
   let page = Dream.param request "page" in
@@ -373,7 +293,7 @@ let page_action_handler request =
           begin
             match action.type_ with
             | "edit" -> parse_action_edit decoded_body' |> ignore
-            | "add"  -> parse_action_add decoded_body' |> ignore
+            | "add"  -> decoded_body' |> parse_action_add |> yojson_of_action_add |> Yojson.Safe.pretty_to_string |> Dream.log "%s"
             | "remove" -> parse_action_remove decoded_body' |> ignore
             | "create" -> parse_action_create_page decoded_body' |> ignore
             | "move"   -> parse_action_move decoded_body' |> ignore

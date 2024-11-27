@@ -1,7 +1,7 @@
 (executable
  (public_name fedon)
  (name main)
- (libraries fedon dream dream-html)
+ (libraries fedon dream dream-html wiki)
  (preprocess (pps lwt_ppx ppx_yojson_conv ppx_deriving.show ))
 )
 
