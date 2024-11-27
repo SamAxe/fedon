@@ -1,6 +1,6 @@
 open Ppx_yojson_conv_lib.Yojson_conv.Primitives
 
-open Wiki.Types
+open Fedwiki.Types
 
 type wiki_server_info =
   { title         : string

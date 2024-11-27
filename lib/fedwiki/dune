@@ -1,6 +1,6 @@
 (library
-  (name wiki)
-  (public_name fedon.wiki)
+  (name fedwiki)
+  (public_name fedon.fedwiki)
   (synopsis "A library for parsing Paniolo source code")
   (libraries dream dream-html)
   (inline_tests)
