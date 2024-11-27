@@ -121,7 +121,7 @@ type journal_item =
   }
   [@@deriving yojson, show]
 
-type fork_page =
+type page =
   { title      : string
   ; story      : item list option [@option]
   ; journal    : journal_item list option [@option]
@@ -135,7 +135,7 @@ type action =
   ; item       : item option [@option]
   ; after      : string option [@option]
   ; order      : string list option [@option]
-  ; fork_page  : fork_page option [@key "forkPage"] [@option]
+  ; fork_page  : page option [@key "forkPage"] [@option]
   ; date       : int
   }
   [@@deriving yojson, show]

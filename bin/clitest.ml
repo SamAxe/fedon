@@ -22,8 +22,8 @@ let () =
       try
         channel
         |> Yojson.Safe.from_channel
-        |> fork_page_of_yojson
-        |> yojson_of_fork_page
+        |> page_of_yojson
+        |> yojson_of_page
         |> Yojson.Safe.pretty_to_string
         |> Printf.printf "%s\n"
       with _ -> Printf.eprintf "Caught exception processing %s\n" in_file
