@@ -372,6 +372,9 @@ let () =
     ; { date   = 15
       ; action = Move { after_id = "124"; item = Yojson.Safe.from_string {|{ "id":"125", "type": "paragraph", "text":"Welcome to my new page"}|} |> fw_story_item_to_story_item }
       }
+    ; { date   = 16
+      ; action = Edit { item = Yojson.Safe.from_string {|{ "id":"125", "type": "paragraph", "text":"Welcome to my other new page"}|} |> fw_story_item_to_story_item }
+      }
      ]
   in
   let story = story_from_journal journal in
