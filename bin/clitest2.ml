@@ -302,13 +302,17 @@ let apply_move_transaction_to_story (journal_move:journal_move) (story:story) : 
     |> apply_add_transaction_to_story_helper story_item journal_move.after_id []
 
 let apply_transaction_to_story (story:story) (story_transaction:story_transaction) : story =
-  match story_transaction.action with
-  | Add    ja -> apply_add_transaction_to_story    ja story
-  | Create jc -> apply_create_transaction_to_story jc story
-  | Edit   je -> apply_edit_transaction_to_story   je story
-  | Fork   jf -> apply_fork_transaction_to_story   jf story
-  | Move   jm -> apply_move_transaction_to_story   jm story
-  | Remove jr -> apply_remove_transaction_to_story jr story
+  try
+    match story_transaction.action with
+    | Add    ja -> apply_add_transaction_to_story    ja story
+    | Create jc -> apply_create_transaction_to_story jc story
+    | Edit   je -> apply_edit_transaction_to_story   je story
+    | Fork   jf -> apply_fork_transaction_to_story   jf story
+    | Move   jm -> apply_move_transaction_to_story   jm story
+    | Remove jr -> apply_remove_transaction_to_story jr story
+  with _ ->
+    Printf.printf "transaction raised exception, not applying\n";
+    story
 
 
 let story_from_journal (journal : journal ) : story =
@@ -373,7 +377,7 @@ let () =
       ; action = Move { after_id = "124"; item = Yojson.Safe.from_string {|{ "id":"125", "type": "paragraph", "text":"Welcome to my new page"}|} |> fw_story_item_to_story_item }
       }
     ; { date   = 16
-      ; action = Edit { item = Yojson.Safe.from_string {|{ "id":"125", "type": "paragraph", "text":"Welcome to my other new page"}|} |> fw_story_item_to_story_item }
+      ; action = Edit { item = Yojson.Safe.from_string {|{ "id":"x125", "type": "paragraph", "text":"Welcome to my other new page"}|} |> fw_story_item_to_story_item }
       }
      ]
   in
