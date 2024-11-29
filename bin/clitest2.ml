@@ -229,27 +229,39 @@ let _add_id_to_item (add_item_id : item_id) (add_item : Yojson.Safe.t) : Yojson.
   in
     `Assoc ( ("id", `String add_item_id) :: item_list )
 
-let rec apply_add_transaction_to_story_helper (add_item : story_item) (after_id : item_id) (epilog:story) (prolog:story) : story =
-  match prolog with
-  | []     -> add_item :: epilog
-  | [hd]   -> add_item :: hd :: epilog
-  | hd::tl ->
-      begin
-        if hd.id = after_id
-        then add_item :: hd :: tl @ epilog
-        else apply_add_transaction_to_story_helper add_item after_id (hd :: epilog) tl
-      end
+let rec apply_add_transaction_to_story_helper (add_item : story_item) (after_id : item_id) (rprolog:story) (prolog:story) : story =
+  if after_id = String.empty
+  then add_item :: prolog
+  else
+    begin
+      match prolog with
+      | []     -> add_item :: rprolog |> List.rev
+      | [hd]   -> add_item :: hd :: rprolog |> List.rev
+      | hd::tl ->
+          begin
+            if hd.id = after_id
+            then
+              begin
+                List.rev rprolog @ ( hd :: add_item :: tl)
+              end
+            else apply_add_transaction_to_story_helper add_item after_id (hd :: rprolog) tl
+          end
+    end
 
 (* if after_id is not found, then appends at end of story *)
 let apply_add_transaction_to_story (journal_add:journal_add) (story:story) : story =
-  story
-  |> apply_add_transaction_to_story_helper journal_add.item journal_add.after_id []
+  let story' =
+    story
+    |> apply_add_transaction_to_story_helper journal_add.item journal_add.after_id []
+  in
+(*     Printf.printf "story       = %s\n\n" (story' |> List.map ( function si -> si.id) |> String.concat ", "); *)
+    story'
 
 (* What does it mean to create a story that isn't empty?
 *)
 
 let apply_create_transaction_to_story (journal_create:journal_create) (story:story) : story =
-
+  Printf.printf "Create story\n\n";
   let helper prolog epilog : story =
     match prolog with
     | []     -> journal_create.item :: epilog
@@ -300,10 +312,10 @@ let apply_transaction_to_story (story:story) (story_transaction:story_transactio
 
 
 let story_from_journal (journal : journal ) : story =
-  let compare_story_transactions (j1:story_transaction) (j2:story_transaction) : int = compare j1.date j2.date in
-  let transactions = journal |> List.sort compare_story_transactions in
+  let compare_story_transaction_dates (j1:story_transaction) (j2:story_transaction) : int = compare j1.date j2.date in
+  let transactions = journal |> List.sort compare_story_transaction_dates in
   let story = transactions |> List.fold_left apply_transaction_to_story empty_story in
-    story |> List.rev
+    story
 
 let _j1 =
   [ { date   = 124
@@ -330,21 +342,35 @@ let () =
   Random.self_init ();
 
   let journal =
-    [ { date   = 124
-      ; action = Create { item = Yojson.Safe.from_string {|{ "type": "create_page", "title": "A new page"}|} |> fw_story_item_to_story_item }
+    [ { date   = 1
+      ; action = Create {                item = Yojson.Safe.from_string {|{ "id":"124","type": "create_page", "title": "A new page"}|} |> fw_story_item_to_story_item }
       }
-    ; { date   = 125
+    ; { date   = 2
+      ; action = Add { after_id = "124"; item = Yojson.Safe.from_string {|{ "id":"128", "type": "paragraph", "text":"The third middle paragraph"}|} |> fw_story_item_to_story_item }
+      }
+    ; { date   = 3
+      ; action = Add { after_id = "124"; item = Yojson.Safe.from_string {|{ "id":"127", "type": "paragraph", "text":"The second middle paragraph"}|} |> fw_story_item_to_story_item }
+      }
+    ; { date   = 4
+      ; action = Add { after_id = "124"; item = Yojson.Safe.from_string {|{ "id":"126", "type": "paragraph", "text":"The middle paragraph"}|} |> fw_story_item_to_story_item }
+      }
+    ; { date   = 5
       ; action = Add { after_id = "124"; item = Yojson.Safe.from_string {|{ "id":"125", "type": "paragraph", "text":"Welcome to my new page"}|} |> fw_story_item_to_story_item }
       }
-    ; { date   = 126
-      ; action = Add { after_id = "125"; item = Yojson.Safe.from_string {|{ "id":"126", "type": "paragraph", "text":"The middle paragraph"}|} |> fw_story_item_to_story_item }
+    ; { date   = 10
+      ; action = Remove { item = Yojson.Safe.from_string {|{ "id":"127", "type": "paragraph", "text":"The second middle paragraph"}|} |> fw_story_item_to_story_item }
       }
-
-    ; { date   = 127
+    ; { date   = 11
+      ; action = Remove { item = Yojson.Safe.from_string {|{ "id":"128", "type": "paragraph", "text":"The third middle paragraph"}|} |> fw_story_item_to_story_item }
+      }
+    ; { date   = 12
+      ; action = Add { after_id = "126"; item = Yojson.Safe.from_string {|{ "id":"128", "type": "paragraph", "text":"The third middle paragraph"}|} |> fw_story_item_to_story_item }
+      }
+    ; { date   = 13
       ; action = Add { after_id = "126"; item = Yojson.Safe.from_string {|{ "id":"127", "type": "paragraph", "text":"The second middle paragraph"}|} |> fw_story_item_to_story_item }
       }
-    ; { date   = 128
-      ; action = Add { after_id = "127"; item = Yojson.Safe.from_string {|{ "id":"128", "type": "paragraph", "text":"The third middle paragraph"}|} |> fw_story_item_to_story_item }
+    ; { date   = 15
+      ; action = Move { after_id = "124"; item = Yojson.Safe.from_string {|{ "id":"125", "type": "paragraph", "text":"Welcome to my new page"}|} |> fw_story_item_to_story_item }
       }
      ]
   in
