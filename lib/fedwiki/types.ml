@@ -71,11 +71,13 @@ type removed_to =
   }
   [@@deriving yojson, show]
 
+(*
 type journal_attribution =
   { page       : string
   ; site       : string option [@option]
   }
   [@@deriving yojson, show]
+*)
 
 
 type journal_item =
