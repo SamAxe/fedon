@@ -1,3 +1,4 @@
+
 open Yojson.Safe.Util
 
 let _show_keys json =
@@ -108,7 +109,7 @@ let get_id (json:Yojson.Safe.t) : Yojson.Safe.t option =
 
 
 
-let get_item_id (json:Yojson.Safe.t) : Yojson.Safe.t option =
+let _get_item_id (json:Yojson.Safe.t) : Yojson.Safe.t option =
   json |> path [ "item"; "id" ]
 
 
@@ -173,14 +174,15 @@ let fork_action (page : render_page) (_action_item : Yojson.Safe.t) : render_pag
 
 *)
 let remove_action (page : render_page) (action_item : Yojson.Safe.t) : render_page =
-  match get_item_id action_item with
+  match get_id action_item with
   | None -> page   (* no item.id in action item, so nothing to remove *)
   | Some action_item_id ->
       begin
         let story' =
           page.story
           |> List.filter ( function story_item ->
-              match get_id story_item with
+              let story_item_id = get_id story_item in
+              match story_item_id with
               | None -> false
               | Some story_id ->
                   begin
