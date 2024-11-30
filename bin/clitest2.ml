@@ -131,7 +131,7 @@ let _story_item_to_fw_story_item (story_item:story_item) : fw_story_item =
    problem a bit better, but for now, conversions and wrapping...
 *)
 type journal_add =
-  { after_id     : item_id
+  { after_id     : item_id option
   ; item         : story_item
 
 (*     (error) *)
@@ -173,7 +173,7 @@ type journal_fork =
 
 type journal_move =
   { item      : story_item
-  ; after_id  : item_id
+  ; after_id  : item_id option
 (*     (error) *)
 (*   ; fork *)
 (*   ; id *)
@@ -185,7 +185,8 @@ type journal_remove =
 (*   ; removedTo *)
   }
 
-type journal_action =
+type story_action =
+  | None
   | Add    of journal_add    [@name "add"]
   | Create of journal_create [@name "create"]
   | Edit   of journal_edit   [@name "edit"]
@@ -195,7 +196,7 @@ type journal_action =
 
 type story_transaction =
   { date   : int
-  ; action : journal_action
+  ; action : story_action
   }
 
 type journal = story_transaction list
@@ -229,10 +230,10 @@ let _add_id_to_item (add_item_id : item_id) (add_item : Yojson.Safe.t) : Yojson.
   in
     `Assoc ( ("id", `String add_item_id) :: item_list )
 
-let rec apply_add_transaction_to_story_helper (add_item : story_item) (after_id : item_id) (rprolog:story) (prolog:story) : story =
-  if after_id = String.empty
-  then add_item :: prolog
-  else
+let rec apply_add_transaction_to_story_helper (add_item : story_item) (after_id_opt : item_id option) (rprolog:story) (prolog:story) : story =
+  match after_id_opt with
+  | None -> add_item :: prolog
+  | Some after_id ->
     begin
       match prolog with
       | []     -> add_item :: rprolog |> List.rev
@@ -244,7 +245,7 @@ let rec apply_add_transaction_to_story_helper (add_item : story_item) (after_id 
               begin
                 List.rev rprolog @ ( hd :: add_item :: tl)
               end
-            else apply_add_transaction_to_story_helper add_item after_id (hd :: rprolog) tl
+            else apply_add_transaction_to_story_helper add_item after_id_opt (hd :: rprolog) tl
           end
     end
 
@@ -304,6 +305,7 @@ let apply_move_transaction_to_story (journal_move:journal_move) (story:story) : 
 let apply_transaction_to_story (story:story) (story_transaction:story_transaction) : story =
   try
     match story_transaction.action with
+    | None      -> story
     | Add    ja -> apply_add_transaction_to_story    ja story
     | Create jc -> apply_create_transaction_to_story jc story
     | Edit   je -> apply_edit_transaction_to_story   je story
@@ -326,7 +328,7 @@ let _j1 =
     ; action = Create { item = Yojson.Safe.from_string "{}" |> fw_story_item_to_story_item }
     }
   ; { date   = 124
-    ; action = Add { after_id = "123"; item = Yojson.Safe.from_string "{}" |> fw_story_item_to_story_item }
+    ; action = Add { after_id = Some "123"; item = Yojson.Safe.from_string "{}" |> fw_story_item_to_story_item }
     }
   ; { date   = 124
     ; action = Edit { item = Yojson.Safe.from_string "{}" |> fw_story_item_to_story_item }
@@ -335,14 +337,14 @@ let _j1 =
     ; action = Fork { item = Yojson.Safe.from_string "{}" |> fw_story_item_to_story_item }
     }
   ; { date   = 124
-    ; action = Move { item = Yojson.Safe.from_string "{}" |> fw_story_item_to_story_item; after_id = "246" }
+    ; action = Move { item = Yojson.Safe.from_string "{}" |> fw_story_item_to_story_item; after_id = Some "246" }
     }
   ; { date   = 124
     ; action = Remove { item = Yojson.Safe.from_string "{}" |> fw_story_item_to_story_item }
     }
    ]
 
-let () =
+let _test1 () =
   Random.self_init ();
 
   let journal =
@@ -350,41 +352,122 @@ let () =
       ; action = Create {                item = Yojson.Safe.from_string {|{ "id":"124","type": "create_page", "title": "A new page"}|} |> fw_story_item_to_story_item }
       }
     ; { date   = 2
-      ; action = Add { after_id = "124"; item = Yojson.Safe.from_string {|{ "id":"128", "type": "paragraph", "text":"The third middle paragraph"}|} |> fw_story_item_to_story_item }
+      ; action = Add { after_id = Some "124"; item = Yojson.Safe.from_string {|{ "id":"128", "type": "paragraph", "text":"The third middle paragraph"}|} |> fw_story_item_to_story_item }
       }
     ; { date   = 3
-      ; action = Add { after_id = "124"; item = Yojson.Safe.from_string {|{ "id":"127", "type": "paragraph", "text":"The second middle paragraph"}|} |> fw_story_item_to_story_item }
+      ; action = Add { after_id = Some "124"; item = Yojson.Safe.from_string {|{ "id":"127", "type": "paragraph", "text":"The second middle paragraph"}|} |> fw_story_item_to_story_item }
       }
     ; { date   = 4
-      ; action = Add { after_id = "124"; item = Yojson.Safe.from_string {|{ "id":"126", "type": "paragraph", "text":"The middle paragraph"}|} |> fw_story_item_to_story_item }
+      ; action = Add { after_id = Some "124"; item = Yojson.Safe.from_string {|{ "id":"126", "type": "paragraph", "text":"The middle paragraph"}|} |> fw_story_item_to_story_item }
       }
     ; { date   = 5
-      ; action = Add { after_id = "124"; item = Yojson.Safe.from_string {|{ "id":"125", "type": "paragraph", "text":"Welcome to my new page"}|} |> fw_story_item_to_story_item }
+      ; action = Add { after_id = Some "124"; item = Yojson.Safe.from_string {|{ "id":"125", "type": "paragraph", "text":"Welcome to my new page"}|} |> fw_story_item_to_story_item }
       }
     ; { date   = 10
-      ; action = Remove { item = Yojson.Safe.from_string {|{ "id":"127", "type": "paragraph", "text":"The second middle paragraph"}|} |> fw_story_item_to_story_item }
+      ; action = Remove {                item = Yojson.Safe.from_string {|{ "id":"127", "type": "paragraph", "text":"The second middle paragraph"}|} |> fw_story_item_to_story_item }
       }
     ; { date   = 11
-      ; action = Remove { item = Yojson.Safe.from_string {|{ "id":"128", "type": "paragraph", "text":"The third middle paragraph"}|} |> fw_story_item_to_story_item }
+      ; action = Remove {                item = Yojson.Safe.from_string {|{ "id":"128", "type": "paragraph", "text":"The third middle paragraph"}|} |> fw_story_item_to_story_item }
       }
     ; { date   = 12
-      ; action = Add { after_id = "126"; item = Yojson.Safe.from_string {|{ "id":"128", "type": "paragraph", "text":"The third middle paragraph"}|} |> fw_story_item_to_story_item }
+      ; action = Add { after_id = Some "126"; item = Yojson.Safe.from_string {|{ "id":"128", "type": "paragraph", "text":"The third middle paragraph"}|} |> fw_story_item_to_story_item }
       }
     ; { date   = 13
-      ; action = Add { after_id = "126"; item = Yojson.Safe.from_string {|{ "id":"127", "type": "paragraph", "text":"The second middle paragraph"}|} |> fw_story_item_to_story_item }
+      ; action = Add { after_id = Some "126"; item = Yojson.Safe.from_string {|{ "id":"127", "type": "paragraph", "text":"The second middle paragraph"}|} |> fw_story_item_to_story_item }
       }
     ; { date   = 15
-      ; action = Move { after_id = "124"; item = Yojson.Safe.from_string {|{ "id":"125", "type": "paragraph", "text":"Welcome to my new page"}|} |> fw_story_item_to_story_item }
+      ; action = Move { after_id = Some "124"; item = Yojson.Safe.from_string {|{ "id":"125", "type": "paragraph", "text":"Welcome to my new page"}|} |> fw_story_item_to_story_item }
       }
     ; { date   = 16
-      ; action = Edit { item = Yojson.Safe.from_string {|{ "id":"x125", "type": "paragraph", "text":"Welcome to my other new page"}|} |> fw_story_item_to_story_item }
+      ; action = Edit {                  item = Yojson.Safe.from_string {|{ "id":"x125", "type": "paragraph", "text":"Welcome to my other new page"}|} |> fw_story_item_to_story_item }
       }
      ]
   in
   let story = story_from_journal journal in
     Printf.printf "%s\n" (show_story story)
 
+let get_item_from_item (json : Yojson.Safe.t) : Yojson.Safe.t option =
+  match json |> member "item" with
+  | `Null -> None
+  | item  -> Some item
+
+let after_id_from_fw_item (json_item : Yojson.Safe.t ) : string option =
+  let item = json_item |> member "after" in
+  match item with
+  | `Null -> None
+  | _     -> Some (item |> to_string)
+
+
+
+let fw_add_item_to_story_action (json_opt : Yojson.Safe.t option) : story_action =
+  match json_opt with
+  | None -> None
+  | Some json ->
+    let after_id_opt = after_id_from_fw_item json in
+      Add { after_id = after_id_opt; item = json |> fw_story_item_to_story_item }
+
+let fw_move_item_to_story_action (_json_opt : Yojson.Safe.t option) : story_action =
+  None
 (*
+  match json_opt with
+  | None -> None
+  | Some json ->
+    let after_id_opt = after_id_from_fw_item json in
+      Add { after_id = after_id_opt; item = json |> fw_story_item_to_story_item }
+
+*)
+
+let fw_remove_item_to_story_action (json_opt : Yojson.Safe.t option) : story_action =
+  match json_opt with
+  | None -> None
+  | Some json ->
+    let item_id = id_from_fw_item json |> withDefault (generateItemId ()) in
+
+  Remove { item = { id      = item_id
+                  ; type_   = type_from_fw_item fw_story_item |> withDefault "no type found"
+                  ; fw_item = fw_story_item
+                  }
+         }
+
+
+
+let fw_journal_item_to_story_action (json : Yojson.Safe.t) : story_action =
+(*   Printf.printf "keys %s\n" (keys json |> String.concat ", "); *)
+  let cmd = type_from_fw_item json in
+  let item = get_item_from_item json in
+    begin
+      match cmd with
+      | Some "add"    -> fw_add_item_to_story_action item
+      | Some "move"   -> fw_move_item_to_story_action item
+      | Some "remove" -> None
+      | Some "fork"   -> None
+      | Some "create" -> None
+      | Some "edit"   -> None
+      | Some ucmd -> Printf.printf "Unhandled command '%s' \n" ucmd; None
+      | None  -> failwith "Cannot find 'type' in a journal item\n"
+    end
+
+type page =
+  { title : string
+  ; _journal : story_action list
+  }
+
+let page_of_yojson (json : Yojson.Safe.t) : page =
+  { title = member "title" json |> to_string
+  ; _journal = member "journal" json |> to_list |> List.map fw_journal_item_to_story_action
+  }
+
+let handle_file (filename : string) =
+  let channel = Stdlib.open_in filename in
+    try
+      let json = Yojson.Safe.from_channel channel in
+        let page = page_of_yojson json in
+          Printf.printf "title = '%s'\n" page.title
+        ; Stdlib.close_in channel
+    with _ ->
+      Stdlib.close_in_noerr channel
+      ; Printf.eprintf "Exception in '%s'\n" filename
+
 
 let () =
   let usage_msg = "./clitest2 [-verbose] <file1> [<file2>] ... -o <output>" in
@@ -403,4 +486,3 @@ let () =
 
     Arg.parse speclist anon_fun usage_msg
     ; !input_files |> List.iter handle_file
-*)
