@@ -84,57 +84,162 @@ type action =
 *)
 
 type page =
-  { title : string
+  { _title : string
   ; _story : Yojson.Safe.t
   ; journal : Yojson.Safe.t
   }
 
-let create_action (story : Yojson.Safe.t list) (item : Yojson.Safe.t) : Yojson.Safe.t list =
-  item :: story
+type render_page =
+  { title : string
+  ; story : Yojson.Safe.t list
+  }
 
-let add_action (story : Yojson.Safe.t list) (item : Yojson.Safe.t) : Yojson.Safe.t list =
-  item :: story
+let empty_render_page =
+  { title = ""
+  ; story = []
+  }
+
+
+let get_item (json:Yojson.Safe.t) : Yojson.Safe.t option =
+  json |> path [ "item" ]
+
+let get_id (json:Yojson.Safe.t) : Yojson.Safe.t option =
+  json |> path [ "id" ]
+
+
 
 let get_item_id (json:Yojson.Safe.t) : Yojson.Safe.t option =
   json |> path [ "item"; "id" ]
 
 
-let edit_action (story : Yojson.Safe.t list) (new_item : Yojson.Safe.t) : Yojson.Safe.t list =
-  let new_item_id = member "id" new_item |> to_string in
-    story
-    |> List.map ( function story_item ->
-        Printf.printf "%s\n" (Yojson.Safe.pretty_to_string story_item);
-        match get_item_id story_item with
-        | None -> story_item
-        | Some story_id ->
-            begin
-              if (story_id |> to_string) = new_item_id
-              then new_item
-              else story_item
-            end
-    )
+(* TODO These actions really are creating pages, not stories...so when it's working, come back and revisit
+   with page structure and basically replace all the story with page.story
+*)
+
+let create_action (page : render_page) (action_item : Yojson.Safe.t) : render_page =
+  match get_item action_item with
+  | None -> page
+  | Some item ->
+      begin
+        let title' =
+          match path [ "title" ] item with
+          | None -> "no title"
+          | Some item -> item |> to_string
+        in
+          match path ["story"] item with
+          | None -> { title = title'; story = item :: page.story }
+          | Some story' -> { title = title'; story = [ story' ] }
+      end
 
 
+let add_action (page : render_page) (action_item : Yojson.Safe.t) : render_page =
+  (* TODO insert in the correct place *)
+  match get_item action_item with
+  | None -> page
+  | Some item -> { page with story = item :: page.story }
 
-let do_action (acc : Yojson.Safe.t list) (item : Yojson.Safe.t) : Yojson.Safe.t list =
+let edit_action (page : render_page) (action_item : Yojson.Safe.t) : render_page =
+  match get_item action_item with
+  | None -> page
+  | Some subitem ->
+      begin
+        let subitem_id = get_id subitem in
+        let story' =
+          page.story
+          |> List.map ( function story_item ->
+              let story_item_id = get_id story_item in
+                if story_item_id = subitem_id
+                then subitem
+                else story_item
+              )
+        in
+        { page with story = story' }
+      end
+
+
+(* TODO Revisit when this is a page structure *)
+let fork_action (page : render_page) (_action_item : Yojson.Safe.t) : render_page =
+  page
+(*
+  match get_item action_item with
+  | None -> []
+  | Some item ->
+      begin
+        let _new_title = path [ "title" ] in
+          match path ["story"] item with
+          | None -> []
+          | Some story' -> story' |> to_list
+      end
+
+*)
+let remove_action (page : render_page) (action_item : Yojson.Safe.t) : render_page =
+  match get_item_id action_item with
+  | None -> page   (* no item.id in action item, so nothing to remove *)
+  | Some action_item_id ->
+      begin
+        let story' =
+          page.story
+          |> List.filter ( function story_item ->
+              match get_id story_item with
+              | None -> false
+              | Some story_id ->
+                  begin
+                    if story_id = action_item_id
+                    then false
+                    else true
+                  end
+          )
+        in
+        { page with story = story'}
+      end
+
+
+let move_action (page : render_page) (action_item : Yojson.Safe.t) : render_page =
+
+  let move_action_helper (story:Yojson.Safe.t list) (acc:Yojson.Safe.t list) (order_id:Yojson.Safe.t) : Yojson.Safe.t list =
+    match List.find_opt ( function item -> get_id item = get_id order_id ) story with
+    | None   -> acc
+    | Some i -> i :: acc
+  in
+
+  match path [ "item"; "order" ] action_item with
+  | None -> page (* no order field, so skip it *)
+  | Some order ->
+      begin
+        let story' =
+          order |> to_list
+          |> List.fold_left (move_action_helper page.story) []
+        in
+        { page with story = story' }
+      end
+
+let do_action (page : render_page) (item : Yojson.Safe.t) : render_page =
   let action = member "type" item |> to_string in
     match action with
-    | "create" -> create_action acc item
-    | "add"    -> add_action acc item
-    | "edit"   -> edit_action acc item
-    | "fork"   -> acc
-    | "move"   -> acc
-    | "remove" -> acc
+    | "create" -> create_action page item
+    | "add"    -> add_action page item
+    | "edit"   -> edit_action page item
+    | "fork"   -> fork_action page item
+    | "move"   -> move_action page item
+    | "remove" -> remove_action page item
     |  _ as w -> failwith (Printf.sprintf "Unknown action %s\n" w)
 
-let story_from_journal (journal : Yojson.Safe.t) : Yojson.Safe.t =
-  let entries = journal |> to_list in
-  let story = `List (List.fold_left do_action [] entries |> List.rev ) in
-(*     Printf.printf "%s\n" (Yojson.Safe.pretty_to_string story); *)
-    story
+let page_from_journal (journal : Yojson.Safe.t) : render_page =
+  let entries =
+    journal
+    |> to_list
+    |> List.sort ( fun item1 item2 ->
+        let date1 = path [ "date" ] item1 in
+        let date2 = path [ "date" ] item2 in
+          compare date1 date2
+    )
+  in
+  let render_page = List.fold_left do_action empty_render_page entries in
+    Printf.printf "%s\n%s\n" (render_page.title) (Yojson.Safe.pretty_to_string (`List render_page.story) );
+    render_page
 
 let page_of_yojson (json : Yojson.Safe.t) : page =
-  { title    = member "title" json |> to_string
+  { _title    = member "title" json |> to_string
   ; _story   = member "story" json
   ; journal  = member "journal" json
   }
@@ -144,9 +249,8 @@ let handle_file (filename : string) =
     try
       let json = Yojson.Safe.from_channel channel in
         let page = page_of_yojson json in
-        let _story = story_from_journal page.journal in
-          Printf.printf "title = '%s'\n" page.title
-        ; Stdlib.close_in channel
+        let _story = page_from_journal page.journal in
+          Stdlib.close_in channel
     with e ->
       Stdlib.close_in_noerr channel
       ; Printf.eprintf "Exception in '%s'\n%s\n" filename (Printexc.to_string e)
