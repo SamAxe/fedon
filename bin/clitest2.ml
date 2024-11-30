@@ -83,378 +83,60 @@ type action =
 
 *)
 
-type item_id = string [@@deriving show]
-
-type fw_story_item = Yojson.Safe.t
-type story_item =
-  { id      : item_id   (* id and type are lifted from fw_item for convienence, but should be read only and not changed *)
-  ; type_   : string
-  ; fw_item : fw_story_item
-  }
-
-let id_from_fw_item (json_item : Yojson.Safe.t ) =
-(*   Printf.printf "keys: %s\n in: %s\n" (Yojson.Safe.Util.keys json_item |> String.concat ", ") (Yojson.Safe.pretty_to_string json_item); *)
-  let item = json_item |> member "id" in
-  match item with
-  | `Null -> None
-  | _     -> Some (item |> to_string)
-
-let type_from_fw_item (json_item : Yojson.Safe.t ) =
-  let item = json_item |> member "type" in
-  match item with
-  | `Null -> None
-  | _     -> Some (item |> to_string)
-
-let withDefault ( default : string ) ( opt : string option ) : string =
-  match opt with
-  | None -> default
-  | Some x -> x
-
-
-let generateItemId () : string =
-  let x1 = Random.full_int Int.max_int in
-    Printf.sprintf "%016x" x1
-
-
-let fw_story_item_to_story_item (fw_story_item:fw_story_item) : story_item =
-  { id      = id_from_fw_item fw_story_item |> withDefault (generateItemId ())
-  ; type_   = type_from_fw_item fw_story_item |> withDefault "no type found"
-  ; fw_item = fw_story_item
-  }
-
-let _story_item_to_fw_story_item (story_item:story_item) : fw_story_item =
-  story_item.fw_item
-
-(* Journals are made of story_items because we want to be able to use
-   Ocaml's standard library to manipulate journal and story.  Atleast
-   for now.  A fw_story_item might make sense after I understand the
-   problem a bit better, but for now, conversions and wrapping...
-*)
-type journal_add =
-  { after_id     : item_id option
-  ; item         : story_item
-
-(*     (error) *)
-(*
-  ; fork
-  ; id           : item_id
-  ; site         : string
-  ; attribution         : string
-  ; certificate         : string
-*)
-  }
-
-type journal_create =
-  { item        : story_item
-(*     (error) *)
-
-(*
-  ; fork
-  ; id
-  ; site
-  ; source
-*)
-  }
-
-type journal_edit =
-  { item         : story_item
-(*     (error) *)
-(*
-  ; fork
-  ; site
-*)
-  }
-
-type journal_fork =
-  { item         : story_item
-(*     (error) *)
-(*   ; site *)
-  }
-
-type journal_move =
-  { item      : story_item
-  ; after_id  : item_id option
-(*     (error) *)
-(*   ; fork *)
-(*   ; id *)
-  }
-
-type journal_remove =
-  { item      : story_item
-(*     (error) *)
-(*   ; removedTo *)
-  }
-
-type story_action =
-  | None
-  | Add    of journal_add    [@name "add"]
-  | Create of journal_create [@name "create"]
-  | Edit   of journal_edit   [@name "edit"]
-  | Fork   of journal_fork   [@name "fork"]
-  | Move   of journal_move   [@name "move"]
-  | Remove of journal_remove [@name "remove"]
-
-type story_transaction =
-  { date   : int
-  ; action : story_action
-  }
-
-type journal = story_transaction list
-
-
-let pp_story_item (fmt:Format.formatter) (story_item:story_item) : unit =
-  let str = Printf.sprintf "{id=%s; type=%s; item=%s}" (show_item_id story_item.id) story_item.type_ (Yojson.Safe.to_string story_item.fw_item) in
-    Format.pp_print_string fmt str
-
-let show_story_item (story_item:story_item) : string =
-  Printf.sprintf "{id=%s; %s}" (show_item_id story_item.id) (Yojson.Safe.to_string story_item.fw_item)
-
-type story = story_item list [@@deriving show]
-let empty_story = []
-
-(*
-type page =
-  { _title : string
-  ; _story : story
-  }
-*)
-
-(* let _empty_page = { _title = ""; _story = [] } *)
-
-let _add_id_to_item (add_item_id : item_id) (add_item : Yojson.Safe.t) : Yojson.Safe.t =
-
-  let item_list =
-    add_item
-    |> Yojson.Safe.Util.to_assoc
-    |> List.filter ( function (k,_v) -> k <> add_item_id )
-  in
-    `Assoc ( ("id", `String add_item_id) :: item_list )
-
-let rec apply_add_transaction_to_story_helper (add_item : story_item) (after_id_opt : item_id option) (rprolog:story) (prolog:story) : story =
-  match after_id_opt with
-  | None -> add_item :: prolog
-  | Some after_id ->
-    begin
-      match prolog with
-      | []     -> add_item :: rprolog |> List.rev
-      | [hd]   -> add_item :: hd :: rprolog |> List.rev
-      | hd::tl ->
-          begin
-            if hd.id = after_id
-            then
-              begin
-                List.rev rprolog @ ( hd :: add_item :: tl)
-              end
-            else apply_add_transaction_to_story_helper add_item after_id_opt (hd :: rprolog) tl
-          end
-    end
-
-(* if after_id is not found, then appends at end of story *)
-let apply_add_transaction_to_story (journal_add:journal_add) (story:story) : story =
-  let story' =
-    story
-    |> apply_add_transaction_to_story_helper journal_add.item journal_add.after_id []
-  in
-(*     Printf.printf "story       = %s\n\n" (story' |> List.map ( function si -> si.id) |> String.concat ", "); *)
-    story'
-
-(* What does it mean to create a story that isn't empty?
-*)
-
-let apply_create_transaction_to_story (journal_create:journal_create) (story:story) : story =
-  Printf.printf "Create story\n\n";
-  let helper prolog epilog : story =
-    match prolog with
-    | []     -> journal_create.item :: epilog
-    | _  -> failwith "Creating a story that isn't empty"
-  in
-    helper story []
-
-let apply_edit_transaction_to_story (journal_edit:journal_edit) (story:story) : story =
-
-  let rec helper prolog epilog : story =
-    match prolog with
-    | [] -> failwith (Printf.sprintf "Edit transaction didn't find valid id '%s'" (show_story_item journal_edit.item) )
-    | hd::tl ->
-        begin
-          if hd.id = journal_edit.item.id
-          then (epilog |> List.rev) @ ( journal_edit.item :: tl )
-          else helper tl (hd :: epilog)
-        end
-  in
-    helper story []
-
-(* Fork replaces the story with the forked story *)
-let apply_fork_transaction_to_story (journal_fork:journal_fork) (_story:story) : story =
-  [ journal_fork.item ]
-
-let apply_remove_transaction_to_story_helper (remove_item_id:item_id) (story:story) : story =
-  story
-    |> List.filter ( function story_item -> story_item.id <>  remove_item_id )
-
-let apply_remove_transaction_to_story (journal_remove:journal_remove) (story:story) : story =
-  apply_remove_transaction_to_story_helper journal_remove.item.id story
-
-(* Move is the same as remove + add, so we'll reuse those helper functions *)
-let apply_move_transaction_to_story (journal_move:journal_move) (story:story) : story =
-  let story_item = story |> List.find ( function story_item -> story_item.id = journal_move.item.id ) in
-  story
-    |> apply_remove_transaction_to_story_helper journal_move.item.id
-    |> apply_add_transaction_to_story_helper story_item journal_move.after_id []
-
-let apply_transaction_to_story (story:story) (story_transaction:story_transaction) : story =
-  try
-    match story_transaction.action with
-    | None      -> story
-    | Add    ja -> apply_add_transaction_to_story    ja story
-    | Create jc -> apply_create_transaction_to_story jc story
-    | Edit   je -> apply_edit_transaction_to_story   je story
-    | Fork   jf -> apply_fork_transaction_to_story   jf story
-    | Move   jm -> apply_move_transaction_to_story   jm story
-    | Remove jr -> apply_remove_transaction_to_story jr story
-  with _ ->
-    Printf.printf "transaction raised exception, not applying\n";
-    story
-
-
-let story_from_journal (journal : journal ) : story =
-  let compare_story_transaction_dates (j1:story_transaction) (j2:story_transaction) : int = compare j1.date j2.date in
-  let transactions = journal |> List.sort compare_story_transaction_dates in
-  let story = transactions |> List.fold_left apply_transaction_to_story empty_story in
-    story
-
-let _j1 =
-  [ { date   = 124
-    ; action = Create { item = Yojson.Safe.from_string "{}" |> fw_story_item_to_story_item }
-    }
-  ; { date   = 124
-    ; action = Add { after_id = Some "123"; item = Yojson.Safe.from_string "{}" |> fw_story_item_to_story_item }
-    }
-  ; { date   = 124
-    ; action = Edit { item = Yojson.Safe.from_string "{}" |> fw_story_item_to_story_item }
-    }
-  ; { date   = 124
-    ; action = Fork { item = Yojson.Safe.from_string "{}" |> fw_story_item_to_story_item }
-    }
-  ; { date   = 124
-    ; action = Move { item = Yojson.Safe.from_string "{}" |> fw_story_item_to_story_item; after_id = Some "246" }
-    }
-  ; { date   = 124
-    ; action = Remove { item = Yojson.Safe.from_string "{}" |> fw_story_item_to_story_item }
-    }
-   ]
-
-let _test1 () =
-  Random.self_init ();
-
-  let journal =
-    [ { date   = 1
-      ; action = Create {                item = Yojson.Safe.from_string {|{ "id":"124","type": "create_page", "title": "A new page"}|} |> fw_story_item_to_story_item }
-      }
-    ; { date   = 2
-      ; action = Add { after_id = Some "124"; item = Yojson.Safe.from_string {|{ "id":"128", "type": "paragraph", "text":"The third middle paragraph"}|} |> fw_story_item_to_story_item }
-      }
-    ; { date   = 3
-      ; action = Add { after_id = Some "124"; item = Yojson.Safe.from_string {|{ "id":"127", "type": "paragraph", "text":"The second middle paragraph"}|} |> fw_story_item_to_story_item }
-      }
-    ; { date   = 4
-      ; action = Add { after_id = Some "124"; item = Yojson.Safe.from_string {|{ "id":"126", "type": "paragraph", "text":"The middle paragraph"}|} |> fw_story_item_to_story_item }
-      }
-    ; { date   = 5
-      ; action = Add { after_id = Some "124"; item = Yojson.Safe.from_string {|{ "id":"125", "type": "paragraph", "text":"Welcome to my new page"}|} |> fw_story_item_to_story_item }
-      }
-    ; { date   = 10
-      ; action = Remove {                item = Yojson.Safe.from_string {|{ "id":"127", "type": "paragraph", "text":"The second middle paragraph"}|} |> fw_story_item_to_story_item }
-      }
-    ; { date   = 11
-      ; action = Remove {                item = Yojson.Safe.from_string {|{ "id":"128", "type": "paragraph", "text":"The third middle paragraph"}|} |> fw_story_item_to_story_item }
-      }
-    ; { date   = 12
-      ; action = Add { after_id = Some "126"; item = Yojson.Safe.from_string {|{ "id":"128", "type": "paragraph", "text":"The third middle paragraph"}|} |> fw_story_item_to_story_item }
-      }
-    ; { date   = 13
-      ; action = Add { after_id = Some "126"; item = Yojson.Safe.from_string {|{ "id":"127", "type": "paragraph", "text":"The second middle paragraph"}|} |> fw_story_item_to_story_item }
-      }
-    ; { date   = 15
-      ; action = Move { after_id = Some "124"; item = Yojson.Safe.from_string {|{ "id":"125", "type": "paragraph", "text":"Welcome to my new page"}|} |> fw_story_item_to_story_item }
-      }
-    ; { date   = 16
-      ; action = Edit {                  item = Yojson.Safe.from_string {|{ "id":"x125", "type": "paragraph", "text":"Welcome to my other new page"}|} |> fw_story_item_to_story_item }
-      }
-     ]
-  in
-  let story = story_from_journal journal in
-    Printf.printf "%s\n" (show_story story)
-
-let get_item_from_item (json : Yojson.Safe.t) : Yojson.Safe.t option =
-  match json |> member "item" with
-  | `Null -> None
-  | item  -> Some item
-
-let after_id_from_fw_item (json_item : Yojson.Safe.t ) : string option =
-  let item = json_item |> member "after" in
-  match item with
-  | `Null -> None
-  | _     -> Some (item |> to_string)
-
-
-
-let fw_add_item_to_story_action (json_opt : Yojson.Safe.t option) : story_action =
-  match json_opt with
-  | None -> None
-  | Some json ->
-    let after_id_opt = after_id_from_fw_item json in
-      Add { after_id = after_id_opt; item = json |> fw_story_item_to_story_item }
-
-let fw_move_item_to_story_action (_json_opt : Yojson.Safe.t option) : story_action =
-  None
-(*
-  match json_opt with
-  | None -> None
-  | Some json ->
-    let after_id_opt = after_id_from_fw_item json in
-      Add { after_id = after_id_opt; item = json |> fw_story_item_to_story_item }
-
-*)
-
-let fw_remove_item_to_story_action (json_opt : Yojson.Safe.t option) : story_action =
-  match json_opt with
-  | None -> None
-  | Some json ->
-    let item_id = id_from_fw_item json |> withDefault (generateItemId ()) in
-
-  Remove { item = { id      = item_id
-                  ; type_   = type_from_fw_item fw_story_item |> withDefault "no type found"
-                  ; fw_item = fw_story_item
-                  }
-         }
-
-
-
-let fw_journal_item_to_story_action (json : Yojson.Safe.t) : story_action =
-(*   Printf.printf "keys %s\n" (keys json |> String.concat ", "); *)
-  let cmd = type_from_fw_item json in
-  let item = get_item_from_item json in
-    begin
-      match cmd with
-      | Some "add"    -> fw_add_item_to_story_action item
-      | Some "move"   -> fw_move_item_to_story_action item
-      | Some "remove" -> None
-      | Some "fork"   -> None
-      | Some "create" -> None
-      | Some "edit"   -> None
-      | Some ucmd -> Printf.printf "Unhandled command '%s' \n" ucmd; None
-      | None  -> failwith "Cannot find 'type' in a journal item\n"
-    end
-
 type page =
   { title : string
-  ; _journal : story_action list
+  ; _story : Yojson.Safe.t
+  ; journal : Yojson.Safe.t
   }
 
+let create_action (story : Yojson.Safe.t list) (item : Yojson.Safe.t) : Yojson.Safe.t list =
+  item :: story
+
+let add_action (story : Yojson.Safe.t list) (item : Yojson.Safe.t) : Yojson.Safe.t list =
+  item :: story
+
+let get_item_id (json:Yojson.Safe.t) : Yojson.Safe.t option =
+  json |> path [ "item"; "id" ]
+
+
+let edit_action (story : Yojson.Safe.t list) (new_item : Yojson.Safe.t) : Yojson.Safe.t list =
+  let new_item_id = member "id" new_item |> to_string in
+    story
+    |> List.map ( function story_item ->
+        Printf.printf "%s\n" (Yojson.Safe.pretty_to_string story_item);
+        match get_item_id story_item with
+        | None -> story_item
+        | Some story_id ->
+            begin
+              if (story_id |> to_string) = new_item_id
+              then new_item
+              else story_item
+            end
+    )
+
+
+
+let do_action (acc : Yojson.Safe.t list) (item : Yojson.Safe.t) : Yojson.Safe.t list =
+  let action = member "type" item |> to_string in
+    match action with
+    | "create" -> create_action acc item
+    | "add"    -> add_action acc item
+    | "edit"   -> edit_action acc item
+    | "fork"   -> acc
+    | "move"   -> acc
+    | "remove" -> acc
+    |  _ as w -> failwith (Printf.sprintf "Unknown action %s\n" w)
+
+let story_from_journal (journal : Yojson.Safe.t) : Yojson.Safe.t =
+  let entries = journal |> to_list in
+  let story = `List (List.fold_left do_action [] entries |> List.rev ) in
+(*     Printf.printf "%s\n" (Yojson.Safe.pretty_to_string story); *)
+    story
+
 let page_of_yojson (json : Yojson.Safe.t) : page =
-  { title = member "title" json |> to_string
-  ; _journal = member "journal" json |> to_list |> List.map fw_journal_item_to_story_action
+  { title    = member "title" json |> to_string
+  ; _story   = member "story" json
+  ; journal  = member "journal" json
   }
 
 let handle_file (filename : string) =
@@ -462,11 +144,12 @@ let handle_file (filename : string) =
     try
       let json = Yojson.Safe.from_channel channel in
         let page = page_of_yojson json in
+        let _story = story_from_journal page.journal in
           Printf.printf "title = '%s'\n" page.title
         ; Stdlib.close_in channel
-    with _ ->
+    with e ->
       Stdlib.close_in_noerr channel
-      ; Printf.eprintf "Exception in '%s'\n" filename
+      ; Printf.eprintf "Exception in '%s'\n%s\n" filename (Printexc.to_string e)
 
 
 let () =
