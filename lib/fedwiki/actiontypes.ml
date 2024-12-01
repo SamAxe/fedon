@@ -17,7 +17,7 @@ type action_add =
 
   ; id    : string
   ; item  : item
-  ; after : string
+  ; after : string option [@option]
   }
   [@@deriving yojson, show]
 

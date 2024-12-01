@@ -291,8 +291,60 @@ let write_results (filename:string) (render_page:render_page) : unit =
 (*         ; cmds := Printf.sprintf "difft --check-only --skip-unchanged %s %s\n if [[ !$? ]]\nthen\n v -d %s %s\nfi\n" fn_orig fn_new fn_orig fn_new :: !cmds *)
 
 
+(* Checks for a .v1.json file, and then a .json file and returns None if neither exist
+
+  filename should be just the page name
+
+ *)
+
+let generate_v1_filename (filename:string) : string =
+  let base = Filename.basename filename |> Filename.remove_extension in
+  let v1_filename = "./server/pages/" ^ base ^ ".v1.json" in
+  v1_filename
+
+let select_page_file (filename:string) : string option =
+  let orig_filename =  "./server/pages/" ^ filename in
+  let v1_filename = generate_v1_filename filename in
+  Dream.log "Checking '%s'" v1_filename;
+  if Sys.file_exists v1_filename
+  then Some v1_filename
+  else
+    begin
+      if Sys.file_exists orig_filename
+      then Some orig_filename
+      else None
+    end
+
+
+
+
+let check_for_create_file_hack (filename : string) (action : Yojson.Safe.t) : string option =
+
+  match member "type" action with
+  | `String value ->
+      begin
+        if value = "create"
+        then
+          begin
+            let v1_fn = generate_v1_filename filename in
+
+            let fh = Stdlib.open_out v1_fn in
+              Printf.fprintf fh "%s" (yojson_of_render_page empty_render_page |> Yojson.Safe.pretty_to_string)
+              ; Stdlib.close_out fh
+              ; Some v1_fn
+          end
+        else None
+      end
+  | _ -> None
+
 let handle_file (filename : string) (action : Yojson.Safe.t) : unit =
-  let channel = Stdlib.open_in ("./server/pages/" ^ filename ^ ".json") in
+  let filename' =
+    match check_for_create_file_hack filename action  with
+    | Some fn -> fn
+    | None    -> generate_v1_filename filename
+
+  in
+  let channel = Stdlib.open_in filename' in
     try
       let json = Yojson.Safe.from_channel channel in
         let page = page_of_yojson json in
