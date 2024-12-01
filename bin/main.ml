@@ -263,24 +263,34 @@ let page_action_handler request =
         ; Dream.html "ok"
       end
 
-let select_page_file (filename:string) : string =
+let select_page_file (filename:string) : string option =
   let base = Filename.basename filename |> Filename.chop_extension in
+  let orig_filename =  "./server/pages/" ^ filename in
   let v1_filename = "./server/pages/" ^ base ^ ".v1.json" in
   Dream.log "Checking '%s'" v1_filename;
   if Sys.file_exists v1_filename
-  then v1_filename
-  else "./server/pages/" ^ filename
+  then Some v1_filename
+  else
+    begin
+      if Sys.file_exists orig_filename
+      then Some orig_filename
+      else None
+    end
 
 let page_handler request =
   let json_page = Dream.param request "json_page" in
     Dream.log "Request for file '%s'" json_page;
-  let filename = select_page_file json_page in
-  let channel = Stdlib.open_in filename in
-  let json = Yojson.Safe.from_channel channel in
+  match select_page_file json_page with
+  | None -> Dream.empty `Not_Found
+  | Some filename ->
+      begin
+        let channel = Stdlib.open_in filename in
+        let json = Yojson.Safe.from_channel channel in
 
-  json
-  |> Yojson.Safe.to_string
-  |> Dream.json
+        json
+        |> Yojson.Safe.to_string
+        |> Dream.json
+      end
 
 
 let () =
