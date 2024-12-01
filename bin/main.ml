@@ -237,15 +237,17 @@ let page_action_handler request =
           with
           | Yojson.Json_error msg ->
               failwith (Printf.sprintf "Terminating input '%s'" msg)
-        in
+          in
+          let action_body = decoded_body' |> Yojson.Safe.from_string in
+
           begin
             match action.type_ with
-            | "edit"   -> parse_action_edit decoded_body' |> ignore
-            | "add"    -> decoded_body' |> parse_action_add |> yojson_of_action_add |> Yojson.Safe.pretty_to_string |> Dream.log "%s"
-            | "remove" -> parse_action_remove decoded_body' |> ignore
-            | "create" -> parse_action_create_page decoded_body' |> ignore
-            | "move"   -> parse_action_move decoded_body' |> ignore
-            | "fork"   -> parse_action_fork decoded_body' |> ignore
+            | "edit"   -> begin decoded_body' |> parse_action_edit |> ignore; Fedwiki.V1_actions.handle_file page action_body end
+            | "add"    -> begin decoded_body' |> parse_action_add |> yojson_of_action_add |> Yojson.Safe.pretty_to_string |> Dream.log "%s" end
+            | "remove" -> begin decoded_body' |> parse_action_remove |> ignore end
+            | "create" -> begin decoded_body' |> parse_action_create_page |> ignore end
+            | "move"   -> begin decoded_body' |> parse_action_move |> ignore end
+            | "fork"   -> begin decoded_body' |> parse_action_fork |> ignore end
             | _      -> Dream.log "Unknown action '%s'" action.type_
           end
 (*
@@ -261,10 +263,19 @@ let page_action_handler request =
         ; Dream.html "ok"
       end
 
+let select_page_file (filename:string) : string =
+  let base = Filename.basename filename |> Filename.chop_extension in
+  let v1_filename = "./server/pages/" ^ base ^ ".v1.json" in
+  Dream.log "Checking '%s'" v1_filename;
+  if Sys.file_exists v1_filename
+  then v1_filename
+  else "./server/pages/" ^ filename
+
 let page_handler request =
   let json_page = Dream.param request "json_page" in
     Dream.log "Request for file '%s'" json_page;
-  let channel = Stdlib.open_in ("./server/pages/" ^ json_page) in
+  let filename = select_page_file json_page in
+  let channel = Stdlib.open_in filename in
   let json = Yojson.Safe.from_channel channel in
 
   json

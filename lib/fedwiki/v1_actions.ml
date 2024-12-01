@@ -1,107 +1,39 @@
 
+
 (*
-  This routines seem to read in FedWiki pages and are able to replay the journal entries
-  and mostly recreate the story included in the pages.
+   Start with implementing existing FedWiki server actions for updating
+   json pages.
 
-  I suspect that there are still errors and inconsistencies in these routines compared to the
-  server.coffee file, and there is no support for plugins in here.
 
-  These routines have all the complexity of using JSON as a data structure rather than as
-  a serialization format.  This nearly forces the use of Yojson.Safe.t as the data type
-  and then forces all the routines to use runtime introspection for completing actions.
-  Alternatives would be something to explore in a version 2 format/approach.
 
+   - request an action
+   - read the file into page components, title, story, and journal
+   - Recreate the story from the journal and
+   - apply the action to the story
+   - add the action to the journal
+   - write the file back out
+
+
+   Note: there is likely some philosophy about what the story part
+   represents in the persistence file.  e.g. it might be a cached version
+   of the rendered journal.  Additionally, there is evidence it's a
+   cached version of other rendering done by plugins, e.g. graphviz.
+   A v2 version should address caching, with posibly a different mechanism.
 *)
 
 open Yojson.Safe.Util
-
-let _show_keys json =
-    Yojson.Safe.Util.keys json |> List.sort compare |> String.concat "," |> Printf.printf "%s\n"
-
-let _show_type json =
-  let type_ = member "type" json |> to_string in
-  let keys_ = keys json in
-    Printf.printf "%s -- %s\n" type_ (String.concat ", " keys_)
-
-
-let _handle_file (filename:string) : unit =
-  let channel = Stdlib.open_in filename in
-  let json = channel |> Yojson.Safe.from_channel in
-(*     Yojson.Safe.Util.keys json |> List.sort compare |> String.concat "," |> Printf.printf "%s\n" *)
-  try
-    let journal = member "journal" json in
-      to_list journal |> List.iter _show_type
-    ; Stdlib.close_in channel
-  with _ ->
-    Stdlib.close_in_noerr channel
-
-
-(* toplevel keys:
-   - title
-   - story
-   - journal
-   - metrics
-   - assets
-
-type action =
-  ; fork_page  : page option [@key "forkPage"] [@option]
-  ; date       : int
-  }
-
-   Journal item types:
-   # type = add
-    after
-    attribution
-    date
-    (error)
-    fork
-    id
-    item
-    site
-    certificate
-
-   # type = create
-    date
-    (error)
-    fork
-    id
-    item
-    site
-    source
-
-   # type = edit
-    date
-    (error)
-    fork
-    id
-    item
-    site
-
-   # type = fork
-    date
-    (error)
-    site
-
-   # type = move
-
-    date
-    (error)
-    fork
-    id
-    order
-
-   # type = remove
-    date
-    (error)
-    id
-    removedTo
-
-*)
 
 type page =
   { title   : string
   ; story   : Yojson.Safe.t
   ; journal : Yojson.Safe.t
+  }
+
+
+let page_of_yojson (json : Yojson.Safe.t) : page =
+  { title    = member "title" json |> to_string
+  ; story    = member "story" json
+  ; journal  = member "journal" json
   }
 
 type render_page =
@@ -116,18 +48,8 @@ let empty_render_page =
   ; journal = []
   }
 
-
 let get_item (json:Yojson.Safe.t) : Yojson.Safe.t option =
   json |> path [ "item" ]
-
-let get_id (json:Yojson.Safe.t) : Yojson.Safe.t option =
-  json |> path [ "id" ]
-
-
-
-let _get_item_id (json:Yojson.Safe.t) : Yojson.Safe.t option =
-  json |> path [ "item"; "id" ]
-
 
 let create_action (page : render_page) (action_item : Yojson.Safe.t) : render_page =
 (*   Printf.printf "Create action\n"; *)
@@ -160,6 +82,9 @@ let create_action (page : render_page) (action_item : Yojson.Safe.t) : render_pa
 
 let get_after_id (json:Yojson.Safe.t) : Yojson.Safe.t option =
   json |> path [ "after" ]
+
+let get_id (json:Yojson.Safe.t) : Yojson.Safe.t option =
+  json |> path [ "id" ]
 
 let is_after (action_item_after_id_string : string) (story_item : Yojson.Safe.t ) : bool =
 (*
@@ -308,6 +233,7 @@ let move_action (page : render_page) (action_item : Yojson.Safe.t) : render_page
         page'
       end
 
+
 let do_action (page : render_page) (item : Yojson.Safe.t) : render_page =
 
   match member "type" item with
@@ -325,6 +251,7 @@ let do_action (page : render_page) (item : Yojson.Safe.t) : render_page =
       end
   | _ -> failwith "type is some other json struct than missing or string"
 
+
 let render_page_from_journal (journal : Yojson.Safe.t) : render_page =
   let entries =
     journal
@@ -338,18 +265,8 @@ let render_page_from_journal (journal : Yojson.Safe.t) : render_page =
   let render_page = List.fold_left do_action empty_render_page entries in
     render_page
 
-let page_of_yojson (json : Yojson.Safe.t) : page =
-  { title    = member "title" json |> to_string
-  ; story    = member "story" json
-  ; journal  = member "journal" json
-  }
-
-let yojson_of_page (page:page) : Yojson.Safe.t =
-  `Assoc
-  [ ("title", `String page.title)
-  ; ("story", page.story)
-  ; ("journal", page.journal)
-  ]
+let apply_action_to_render_page (render_page:render_page) (action:Yojson.Safe.t) : render_page =
+  do_action render_page action
 
 let yojson_of_render_page (render_page:render_page) : Yojson.Safe.t =
   `Assoc
@@ -358,60 +275,35 @@ let yojson_of_render_page (render_page:render_page) : Yojson.Safe.t =
   ; ("journal", `List (render_page.journal |> List.rev) )
   ]
 
-let cmds = ref []
-
-let write_results (filename:string) (page:page) (render_page:render_page) : unit =
+let write_results (filename:string) (render_page:render_page) : unit =
 (*   let render_page' = { render_page with journal = page.journal} in *)
+(*
   let render_page' = render_page in
   let fn_orig = "temp/" ^ filename ^ ".orig.json" in
   let fh_orig = Stdlib.open_out fn_orig in
     Printf.fprintf fh_orig "%s" (yojson_of_page page |> Yojson.Safe.pretty_to_string)
     ; Stdlib.close_out fh_orig
-    ; let fn_new = "temp/" ^ filename ^ ".new.json" in
+*)
+    let fn_new = "./server/pages/" ^ filename ^ ".v1.json" in
       let fh_new = Stdlib.open_out fn_new in
-        Printf.fprintf fh_new "%s" (yojson_of_render_page render_page' |> Yojson.Safe.pretty_to_string)
+        Printf.fprintf fh_new "%s" (yojson_of_render_page render_page |> Yojson.Safe.pretty_to_string)
         ; Stdlib.close_out fh_new
-        ; cmds := Printf.sprintf "difft --check-only --skip-unchanged %s %s" fn_orig fn_new :: !cmds
 (*         ; cmds := Printf.sprintf "difft --check-only --skip-unchanged %s %s\n if [[ !$? ]]\nthen\n v -d %s %s\nfi\n" fn_orig fn_new fn_orig fn_new :: !cmds *)
 
 
-
-let handle_file (filename : string) =
-  let channel = Stdlib.open_in filename in
+let handle_file (filename : string) (action : Yojson.Safe.t) : unit =
+  let channel = Stdlib.open_in ("./server/pages/" ^ filename ^ ".json") in
     try
       let json = Yojson.Safe.from_channel channel in
         let page = page_of_yojson json in
+
         let render_page = render_page_from_journal page.journal in
+          let render_page' = apply_action_to_render_page render_page action in
           Stdlib.close_in channel
           ; let fname = Filename.basename filename in
-            write_results fname page render_page
+            write_results fname render_page'
     with e ->
       Stdlib.close_in_noerr channel
       ; Printf.eprintf "Exception in '%s'\n%s\n" filename (Printexc.to_string e)
 
 
-let () =
-  let usage_msg = "./clitest2 [-verbose] <file1> [<file2>] ... -o <output>" in
-  let verbose = ref false in
-  let input_files = ref [] in
-  let output_file = ref "" in
-
-  let anon_fun filename =
-    input_files := filename::!input_files
-  in
-
-  let speclist =
-    [("-verbose", Arg.Set verbose, "Output debug information");
-     ("-o", Arg.Set_string output_file, "Set output file name")]
-  in
-
-    Arg.parse speclist anon_fun usage_msg
-    ; !input_files |> List.iter handle_file
-    ; Printf.printf "%s\n" (String.concat "\n" !cmds)
-
-
-(* In order to use the journal to recreate the page/story
-
-   1. add items with a missing after field are inserted at front of list
-   2. journals with a missing title?  (could use the slugname/filename
-*)
