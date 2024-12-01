@@ -240,8 +240,8 @@ let page_action_handler request =
         in
           begin
             match action.type_ with
-            | "edit" -> parse_action_edit decoded_body' |> ignore
-            | "add"  -> decoded_body' |> parse_action_add |> yojson_of_action_add |> Yojson.Safe.pretty_to_string |> Dream.log "%s"
+            | "edit"   -> parse_action_edit decoded_body' |> ignore
+            | "add"    -> decoded_body' |> parse_action_add |> yojson_of_action_add |> Yojson.Safe.pretty_to_string |> Dream.log "%s"
             | "remove" -> parse_action_remove decoded_body' |> ignore
             | "create" -> parse_action_create_page decoded_body' |> ignore
             | "move"   -> parse_action_move decoded_body' |> ignore

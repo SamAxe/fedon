@@ -1,4 +1,18 @@
 
+(*
+  This routines seem to read in FedWiki pages and are able to replay the journal entries
+  and mostly recreate the story included in the pages.
+
+  I suspect that there are still errors and inconsistencies in these routines compared to the
+  server.coffee file, and there is no support for plugins in here.
+
+  These routines have all the complexity of using JSON as a data structure rather than as
+  a serialization format.  This nearly forces the use of Yojson.Safe.t as the data type
+  and then forces all the routines to use runtime introspection for completing actions.
+  Alternatives would be something to explore in a version 2 format/approach.
+
+*)
+
 open Yojson.Safe.Util
 
 let _show_keys json =
@@ -114,10 +128,6 @@ let get_id (json:Yojson.Safe.t) : Yojson.Safe.t option =
 let _get_item_id (json:Yojson.Safe.t) : Yojson.Safe.t option =
   json |> path [ "item"; "id" ]
 
-
-(* TODO These actions really are creating pages, not stories...so when it's working, come back and revisit
-   with page structure and basically replace all the story with page.story
-*)
 
 let create_action (page : render_page) (action_item : Yojson.Safe.t) : render_page =
 (*   Printf.printf "Create action\n"; *)
