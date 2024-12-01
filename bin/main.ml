@@ -261,6 +261,17 @@ let page_action_handler request =
         ; Dream.html "ok"
       end
 
+let page_handler request =
+  let json_page = Dream.param request "json_page" in
+    Dream.log "Request for file '%s'" json_page;
+  let channel = Stdlib.open_in ("./server/pages/" ^ json_page) in
+  let json = Yojson.Safe.from_channel channel in
+
+  json
+  |> Yojson.Safe.to_string
+  |> Dream.json
+
+
 let () =
   Dream.run
 (*     ~tls:true *)
@@ -288,7 +299,8 @@ let () =
     ; Dream.post "/auth/reclaim/" reclaim_handler
     ; Dream.put  "/page/:page/action" page_action_handler
 
-    ; Dream.get  "/**" (Dream.static "./server/pages")
+(*     ; Dream.get  "/**" (Dream.static "./server/pages") *)
+    ; Dream.get  "/:json_page" page_handler
     ; Dream.get  "/fail"
         (fun _ ->
           raise (Failure "The Web app failed!"))
