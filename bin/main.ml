@@ -243,11 +243,11 @@ let page_action_handler request =
           begin
             match action.type_ with
             | "edit"   -> begin decoded_body' |> parse_action_edit |> ignore; Fedwiki.V1_actions.handle_file page action_body end
-            | "add"    -> begin decoded_body' |> parse_action_add |> yojson_of_action_add |> Yojson.Safe.pretty_to_string |> Dream.log "%s" end
-            | "remove" -> begin decoded_body' |> parse_action_remove |> ignore end
-            | "create" -> begin decoded_body' |> parse_action_create_page |> ignore end
-            | "move"   -> begin decoded_body' |> parse_action_move |> ignore end
-            | "fork"   -> begin decoded_body' |> parse_action_fork |> ignore end
+            | "add"    -> begin decoded_body' |> parse_action_add |> ignore; Fedwiki.V1_actions.handle_file page action_body end
+            | "remove" -> begin decoded_body' |> parse_action_remove |> ignore ; Fedwiki.V1_actions.handle_file page action_body end
+            | "create" -> begin decoded_body' |> parse_action_create_page |> ignore ; Fedwiki.V1_actions.handle_file page action_body end
+            | "move"   -> begin decoded_body' |> parse_action_move |> ignore ; Fedwiki.V1_actions.handle_file page action_body end
+            | "fork"   -> begin decoded_body' |> parse_action_fork |> ignore ; Fedwiki.V1_actions.handle_file page action_body end
             | _      -> Dream.log "Unknown action '%s'" action.type_
           end
 (*
