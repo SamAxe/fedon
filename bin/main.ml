@@ -296,7 +296,7 @@ let () =
     ; Dream.get  "/client.js" (Dream.from_filesystem "./server/" "client.js")
     ; Dream.get  "/client.js.map" (Dream.from_filesystem "./server/" "client.js.map")   (* This is for debugging only *)
     ; Dream.get  "/security/**" (Dream.static "./server/security")
-    ; Dream.get  "/system/**" (Dream.static "./server/system")
+    ; Dream.get  "/system/**" (Dream.static "./server/system")  (* TODO these should be dynmic? or not served? *)
     ; Dream.get  "/images/**" (Dream.static "./server/images")
     ; Dream.get  "/plugins/**" (Dream.static "./server/plugins")
     ; Dream.get  "/js/**" (Dream.static "./server/js")
