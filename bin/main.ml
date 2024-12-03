@@ -299,6 +299,7 @@ let () =
     ; Dream.get  "/system/**" (Dream.static "./server/system")  (* TODO these should be dynmic? or not served? *)
     ; Dream.get  "/images/**" (Dream.static "./server/images")
     ; Dream.get  "/plugins/**" (Dream.static "./server/plugins")
+    ; Dream.get  "/elmclient/**" (Dream.static "./server/client2/")
     ; Dream.get  "/js/**" (Dream.static "./server/js")
     ; Dream.get  "/style/**" (Dream.static "./server/style")
     ; Dream.get  "/theme/**" (Dream.static "./server/theme")

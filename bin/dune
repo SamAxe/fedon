@@ -22,4 +22,12 @@
  (modules clitest2)
 )
 
+(executable
+ (public_name clitest3)
+ (name clitest3)
+ (libraries fedon fedwiki yojson)
+ (preprocess (pps lwt_ppx ppx_yojson_conv ppx_deriving.show ))
+ (modules clitest3)
+)
+
 
